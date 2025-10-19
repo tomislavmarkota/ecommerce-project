@@ -1,0 +1,17 @@
+.container {
+  width: 20px;
+  height: 100%;
+  padding: 10px 20px;
+  background-color: black;
+  transition: width 0.3s ease-in-out;
+  overflow: hidden;
+}
+
+.imgWrapper {
+  width: 100%;
+  text-align: end;
+}
+
+.expanded {
+  width: 200px;
+}

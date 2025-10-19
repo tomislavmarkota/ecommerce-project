@@ -1,0 +1,19 @@
+.loginContainer {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-top: 20%;
+}
+
+.loginForm {
+  padding: 40px;
+  > input {
+    width: 100%;
+  }
+}
+
+.title {
+  text-align: center;
+  color: #323130;
+  font-size: 52;
+}
