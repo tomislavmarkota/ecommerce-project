@@ -1,17 +1,64 @@
+@use '../../variables';
+
 .container {
-  width: 20px;
+  width: 24px;
   height: 100%;
   padding: 10px 20px;
-  background-color: black;
+  background-color: var(--secondary-bg-color);
   transition: width 0.3s ease-in-out;
   overflow: hidden;
 }
 
 .imgWrapper {
   width: 100%;
-  text-align: end;
+  text-align: right;
 }
 
 .expanded {
   width: 200px;
+}
+
+// .iconWrapper {
+//   height: 40px;
+//   display: flex;
+//   gap: 10px;
+//   align-items: center;
+// }
+
+.iconWrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  flex-shrink: 0;
+
+  svg {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    transition: transform 0.3s ease;
+  }
+}
+
+.iconTitle {
+  margin: 0;
+  color: var(--primary-icon-color);
+  line-height: 150%;
+  font-size: 14px;
+  font-weight: 100;
+}
+
+.icon {
+  path {
+    stroke: var(--primary-icon-color);
+  }
+}
+
+.openIcon {
+  fill: var(--primary-icon-color);
+}
+.closeIcon {
+  path {
+    stroke: var(--primary-icon-color);
+  }
 }

@@ -1,3 +1,5 @@
+@use './variables.scss';
+
 @font-face {
   font-family: 'Roboto';
   src: url('font/Roboto-Regular.ttf') format('truetype');
@@ -14,4 +16,7 @@ body,
 }
 body {
   font-family: 'Roboto', sans-serif;
+  background-color: var(--primary-bg-color);
+  color: var(--primary-text-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }

@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import Header from './pages/admin/header';
 import { ThemeProvider } from './context/themeProvider.context';
+import { Outlet } from 'react-router';
+import SideBarMenu from './components/sidebar/SideBarMenu';
 
 function App() {
   useEffect(() => {
@@ -16,8 +18,8 @@ function App() {
   return (
     <ThemeProvider value={'light'}>
       <Header />
-      <h1>test</h1>
-      <button onClick={handleLogin}>Login with Google</button>
+      <SideBarMenu />
+      <Outlet />
     </ThemeProvider>
   );
 }
