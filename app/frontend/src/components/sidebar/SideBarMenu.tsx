@@ -5,7 +5,7 @@ import HamburgerMenu from '../../assets/hamburger-menu.svg?react';
 import DashboardIcon from '../../assets/dashboard.svg?react';
 import StoreIcon from '../../assets/store.svg?react';
 import TransactionIcon from '../../assets/transaction.svg?react';
-import { useNavigate } from 'react-router';
+import { NavLink } from 'react-router';
 
 type Icons = {
   id: number;
@@ -30,8 +30,6 @@ const icons: Icons = [
 function SideBarMenu() {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const navigate = useNavigate();
-
   const toggleSidebar = () => {
     setIsExpanded(!isExpanded);
   };
@@ -45,14 +43,20 @@ function SideBarMenu() {
           <HamburgerMenu onClick={toggleSidebar} className={sidebarStyles.closeIcon} />
         )}
       </div>
-      <div>
+      <div className={sidebarStyles.iconContainer}>
         {icons.map((icon) => {
           const IconComponent = icon.component;
           return (
-            <div key={icon.id} className={sidebarStyles.iconWrapper} onClick={() => navigate(icon.route)}>
+            <NavLink
+              key={icon.id}
+              to={icon.route}
+              className={({ isActive }) => {
+                return isActive ? `${sidebarStyles.iconWrapper} ${sidebarStyles.active}` : sidebarStyles.iconWrapper;
+              }}
+            >
               <IconComponent className={sidebarStyles.icon} />
               {isExpanded && <h6 className={sidebarStyles.iconTitle}>{icon.name}</h6>}
-            </div>
+            </NavLink>
           );
         })}
       </div>

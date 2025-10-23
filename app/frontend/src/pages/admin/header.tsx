@@ -1,4 +1,4 @@
-import React, { use } from 'react';
+import { use } from 'react';
 import { ThemeContext } from '../../context/themeProvider.context';
 import ThemeSwitcher from '../../context/ThemeSwitcher';
 const Header = () => {
@@ -13,8 +13,9 @@ const Header = () => {
   return (
     <header
       style={{
-        background: theme === 'dark' ? '#333' : '#fff',
+        background: 'var(--secondary-bg-color)',
         padding: '10px',
+        transition: '0.3s ease',
       }}
     >
       <h1 style={{ color: theme === 'dark' ? '#fff' : '#000' }}>React 19 Theme Demo</h1>
