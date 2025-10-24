@@ -1,0 +1,17 @@
+.header {
+  height: 50px;
+  background: var(--secondary-bg-color);
+  transition: 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 25px;
+}
+
+// .searchInput {
+//   border: 1px solid var(--search-input-border);
+//   border-radius: 12px;
+//   background-color: transparent;
+//   padding: 8px;
+//   color: var(--primary-text-color);
+// }

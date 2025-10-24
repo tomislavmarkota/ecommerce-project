@@ -1,8 +1,24 @@
 .inputContainer {
+  position: relative;
 }
 
 .inputLabel {
 }
 
 .input {
+  border: 1px solid var(--search-input-border);
+  border-radius: 12px;
+  background-color: transparent;
+  padding: 8px;
+  color: var(--primary-text-color);
+}
+
+.icon {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  path {
+    stroke: var(--primary-text-color);
+  }
 }

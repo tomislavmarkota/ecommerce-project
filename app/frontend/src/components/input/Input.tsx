@@ -6,17 +6,28 @@ export type LabelProps = {
 };
 
 export type InputType = {
-  label: LabelProps;
   inputProps: React.InputHTMLAttributes<HTMLInputElement>;
+  label?: LabelProps;
+  iconComponent?: React.FunctionComponent<
+    React.SVGProps<SVGSVGElement> & {
+      title?: string;
+      titleId?: string;
+      desc?: string;
+      descId?: string;
+    }
+  >;
 };
 
 function Input(props: InputType) {
   return (
     <div className={inputStyle.inputContainer}>
-      <label className={inputStyle.inputLabel} {...props.label.labelProps}>
-        {props.label.text}
-      </label>
+      {props.label && (
+        <label className={inputStyle.inputLabel} {...props.label.labelProps}>
+          {props.label.text}
+        </label>
+      )}
       <input className={inputStyle.input} {...props.inputProps} />
+      {props.iconComponent && <props.iconComponent className={inputStyle.icon} />}
     </div>
   );
 }

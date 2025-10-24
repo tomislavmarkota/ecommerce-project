@@ -22,7 +22,7 @@ type Icons = {
 }[];
 
 const icons: Icons = [
-  { id: 1, component: DashboardIcon, name: 'Dashboard', route: '/dashboard' },
+  { id: 1, component: DashboardIcon, name: 'Dashboard', route: '/' },
   { id: 2, component: StoreIcon, name: 'Product', route: '/product' },
   { id: 3, component: TransactionIcon, name: 'Transaction', route: '/transaction' },
 ];

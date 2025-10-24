@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import Header from './pages/admin/header';
+import Header from './pages/admin/header/Header';
 import { ThemeProvider } from './context/themeProvider.context';
 import { Outlet } from 'react-router';
 import SideBarMenu from './components/sidebar/SideBarMenu';
+import appStyles from './index.module.scss';
 
 function App() {
   useEffect(() => {
@@ -17,9 +18,13 @@ function App() {
 
   return (
     <ThemeProvider value={'light'}>
-      <Header />
-      <SideBarMenu />
-      <Outlet />
+      <div className={appStyles.appContainer}>
+        <SideBarMenu />
+        <div className={appStyles.content}>
+          <Header />
+          <Outlet />
+        </div>
+      </div>
     </ThemeProvider>
   );
 }
