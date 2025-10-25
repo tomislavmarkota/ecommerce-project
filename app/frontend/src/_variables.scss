@@ -9,6 +9,9 @@
   --theme-toggler-circle: #ffffff;
   --theme-toggler-bg: #d0d5dd;
   --search-input-border: #b0b0b0;
+  --notification-number-bg: #ea3030;
+  --notification-number: #ffffff;
+  --profile-active-circle: #28b652;
 }
 
 [data-theme='dark'] {
@@ -22,4 +25,7 @@
   --theme-toggler-circle: #1a71f6;
   --theme-toggler-bg: #3d3d3d;
   --search-input-border: #d1d1d1;
+  --notification-number-bg: #ec4747;
+  --notification-number: #0d0d0d;
+  --profile-active-circle: #23a149;
 }

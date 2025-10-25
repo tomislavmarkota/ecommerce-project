@@ -1,5 +1,5 @@
 .header {
-  height: 50px;
+  height: 60px;
   background: var(--secondary-bg-color);
   transition: 0.3s ease;
   display: flex;
@@ -8,10 +8,90 @@
   padding: 8px 25px;
 }
 
-// .searchInput {
-//   border: 1px solid var(--search-input-border);
-//   border-radius: 12px;
-//   background-color: transparent;
-//   padding: 8px;
-//   color: var(--primary-text-color);
-// }
+.headerIcons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+}
+
+.notificationWrapper {
+  position: relative;
+}
+
+.notificationContainer {
+  background-color: var(--theme-toggler-bg);
+  border-radius: 9px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 36px;
+  height: 38px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 0.7;
+  }
+}
+
+.notificationPopUp {
+  width: 200px;
+  height: 400px;
+  background-color: var(--theme-toggler-bg);
+  position: absolute;
+  box-shadow: rgba(9, 30, 66, 0.25) 0px 4px 8px -2px, rgba(9, 30, 66, 0.08) 0px 0px 0px 1px;
+  top: 40px;
+  right: 0;
+  border-radius: 9px;
+}
+
+.notificationNumber {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--notification-number-bg);
+  color: var(--notification-number);
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  font-size: 8px;
+  border-radius: 2px;
+  width: 13px;
+  height: 12px;
+}
+
+.notificationIcon {
+  path {
+    stroke: var(--primary-text-color);
+  }
+}
+
+.separator {
+  height: 38px;
+  width: 2px;
+  background-color: #c9c9c9;
+}
+
+.profileImgContainer {
+  position: relative;
+}
+
+.profileImg {
+  border-radius: 6px;
+  object-fit: cover;
+  width: 36px;
+  height: 38px;
+}
+
+.profileActiveCircle {
+  display: block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  position: absolute;
+  background-color: var(--profile-active-circle);
+  right: -4px;
+  bottom: 0;
+}

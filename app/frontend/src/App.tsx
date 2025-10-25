@@ -22,7 +22,9 @@ function App() {
         <SideBarMenu />
         <div className={appStyles.content}>
           <Header />
-          <Outlet />
+          <div className={appStyles.pageWrapper}>
+            <Outlet />
+          </div>
         </div>
       </div>
     </ThemeProvider>
