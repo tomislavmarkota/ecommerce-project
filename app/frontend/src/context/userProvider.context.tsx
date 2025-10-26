@@ -2,6 +2,7 @@
 import axios from 'axios';
 import { createContext, useState, useEffect } from 'react';
 import api from '../api/axios';
+import { refreshSession } from '../utils/refreshManager';
 
 interface User {
   email: string;
@@ -32,6 +33,7 @@ const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
   // Automatically attach the in-memory access token to all requests
   useEffect(() => {
     const requestInterceptor = api.interceptors.request.use(
@@ -49,35 +51,21 @@ const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     };
   }, [accessToken]);
 
-  // useEffect(() => {
-  //   const tryRefresh = async () => {
-  //     const res = await fetch(`${API_URL}/api/auth/refresh`, { credentials: 'include' });
-  //     if (res.ok) {
-  //       const data = await res.json();
-  //       setAccessToken(data.accessToken);
-  //       setUser(data.user);
-  //       console.log('data from tryRefresh', data);
-  //     }
-  //   };
-  //   tryRefresh();
-  // }, []);
   useEffect(() => {
     const restoreSession = async () => {
-      try {
-        const res = await api.get('/auth/refresh', { withCredentials: true });
-        if (res.data?.user) {
-          setUser(res.data.user);
-          setAccessToken(res.data.accessToken);
-        }
-      } catch (err) {
-        console.warn('No active session');
-      } finally {
-        setLoading(false);
+      const data = await refreshSession().catch(() => null);
+
+      if (data?.user) {
+        setUser(data.user);
+        setAccessToken(data.accessToken);
       }
+
+      setLoading(false);
     };
 
     restoreSession();
   }, []);
+
   console.log('user', user);
   console.log('accessToken', accessToken);
   const logout = async () => {
