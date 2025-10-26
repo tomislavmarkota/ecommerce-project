@@ -1,7 +1,8 @@
 import React from 'react';
+import PageTitle from '../../../components/pageTitle/PageTitle';
 
 function Customers() {
-  return <div>Customers</div>;
+  return <PageTitle name={'Customers'} />;
 }
 
 export default Customers;

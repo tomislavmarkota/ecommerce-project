@@ -1,85 +1,38 @@
-import { useEffect, useState } from 'react';
-import loginStyles from './login.module.scss';
-import Input, { InputType } from '../../../components/input/Input';
+// Login.tsx
+import { use } from 'react';
+import { UserContext } from '../../../context/userProvider.context';
+import { useNavigate } from 'react-router';
+import { login } from '../../../api/auth';
 
-function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+const Login = () => {
+  const navigate = useNavigate();
+  const { setAccessToken, setUser } = use(UserContext);
 
-  useEffect(() => {
-    fetch('http://localhost:8000/products')
-      .then((res) => res.json())
-      .then((data) => console.log(data))
-      .catch((err) => console.log(err));
-  }, []);
-
-  const handleLogin = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    //window.location.href = 'http://localhost:8000/auth/google';
-    const reqData = {
-      email,
-      password,
-    };
-    //fetch('http://localhost:8000/signin', {
-    fetch('http://localhost:8000/signup', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(reqData),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        console.log('Server response:', data);
-      })
-      .catch((err) => {
-        console.error('Error:', err);
-      });
+    const email = (e.target as any).email.value;
+    const password = (e.target as any).password.value;
+
+    try {
+      const res = await login(email, password);
+      const { user, accessToken } = res.data;
+
+      setUser(user);
+      setAccessToken(accessToken); // in-memory only
+
+      navigate('/dashboard');
+    } catch (err: any) {
+      alert(err.message || 'Login failed');
+    }
   };
 
-  const emailInputProps: InputType = {
-    label: { text: 'Email' },
-    inputProps: {
-      type: 'email',
-      placeholder: 'Enter your email',
-      name: 'email',
-      required: true,
-      value: email,
-      onChange: (e) => setEmail(e.target.value),
-    },
-  };
-
-  const pwInputProps: InputType = {
-    label: { text: 'Password' },
-    inputProps: {
-      type: 'password',
-      placeholder: 'Enter your password',
-      name: 'password',
-      required: true,
-      value: password,
-      onChange: (e) => setPassword(e.target.value),
-    },
-  };
-
-  console.log('pw: ', password, 'email: ', email);
   return (
-    <div className={loginStyles.loginContainer}>
-      <h1 className={loginStyles.title}>Sign Up</h1>
-      <button>Login with Google</button>
-      <form className={loginStyles.loginForm}>
-        <Input {...emailInputProps} />
-        <Input {...pwInputProps} />
-        <div>
-          <div>
-            <input type="checkbox" />
-            <label>Remember me ?</label>
-          </div>
-          <a>Forget Password</a>
-        </div>
-        <button onClick={(e) => handleLogin(e)}>Sign in</button>
-      </form>
-    </div>
+    <form onSubmit={handleSubmit}>
+      <input name="email" type="email" required placeholder="Email" />
+      <input name="password" type="password" required placeholder="Password" />
+      <button type="submit">Login</button>
+    </form>
   );
-}
+};
 
 export default Login;

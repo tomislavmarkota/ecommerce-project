@@ -1,33 +1,47 @@
-import { useEffect } from 'react';
-import Header from './pages/admin/header/Header';
+import { lazy } from 'react';
 import { ThemeProvider } from './context/themeProvider.context';
-import { Outlet } from 'react-router';
-import SideBarMenu from './components/sidebar/SideBarMenu';
-import appStyles from './index.module.scss';
+import { BrowserRouter, Route, Routes } from 'react-router';
+import { UserProvider } from './context/userProvider.context';
+import ProtectedRoute from './routes/protectedRoute';
+import Login from './pages/admin/login/Login';
+import AppContainer from './pages/appContainer/AppContainer';
+
+const Dashboard = lazy(() => import('./pages/admin/dashboard/Dashboard'));
+const Product = lazy(() => import('./pages/admin/product/Product'));
+const Transaction = lazy(() => import('./pages/admin/transaction/Transaction'));
+const Customers = lazy(() => import('./pages/admin/customers/Customers'));
+const SalesReport = lazy(() => import('./pages/admin/salesReport/SalesReport'));
+const Account = lazy(() => import('./pages/admin/account/Account'));
+const Help = lazy(() => import('./pages/admin/help/Help'));
+const AdminAddProduct = lazy(() => import('./pages/admin/addProduct/AddProduct'));
 
 function App() {
-  useEffect(() => {
-    fetch('http://localhost:8000/products')
-      .then((res) => res.json())
-      .then((data) => console.log(data))
-      .catch((err) => console.log(err));
-  }, []);
-  const handleLogin = () => {
-    window.location.href = 'http://localhost:8000/auth/google';
-  };
-
   return (
-    <ThemeProvider value={'light'}>
-      <div className={appStyles.appContainer}>
-        <SideBarMenu />
-        <div className={appStyles.content}>
-          <Header />
-          <div className={appStyles.pageWrapper}>
-            <Outlet />
-          </div>
-        </div>
-      </div>
-    </ThemeProvider>
+    <UserProvider>
+      <ThemeProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<div>home</div>} />
+
+            {/* Protected “ADMIN” routes */}
+            <Route element={<ProtectedRoute />}>
+              <Route element={<AppContainer />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/product" element={<Product />} />
+                <Route path="/transaction" element={<Transaction />} />
+                <Route path="/customers" element={<Customers />} />
+                <Route path="/sales-report" element={<SalesReport />} />
+                <Route path="/account" element={<Account />} />
+                <Route path="/help" element={<Help />} />
+                <Route path="/add-product" element={<AdminAddProduct />} />
+              </Route>
+            </Route>
+
+            <Route path="/login" element={<Login />} />
+          </Routes>
+        </BrowserRouter>
+      </ThemeProvider>
+    </UserProvider>
   );
 }
 

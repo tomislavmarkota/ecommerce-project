@@ -1,7 +1,7 @@
-import dashboardStyles from './dashboard.module.scss';
+import PageTitle from '../../../components/pageTitle/PageTitle';
 
 function Dashboard() {
-  return <div className={dashboardStyles.dashboardPage}>dashboard</div>;
+  return <PageTitle name={'Dashboard'} />;
 }
 
 export default Dashboard;

@@ -6,11 +6,15 @@ import Input, { InputType } from '../../../components/input/Input';
 import SearchIcon from '../../../assets/search.svg?react';
 import NotificatonIcon from '../../../assets/notification.svg?react';
 import profileImage from '../../../assets/Rectangle 20.png';
+import { UserContext } from '../../../context/userProvider.context';
 
 const Header = () => {
   const [search, setSearch] = useState('');
   const [showPopupNotification, setShowPopupNotification] = useState(false);
-  const notificationRef = useRef<HTMLDivElement>(null); // 👈 create ref for the notification container
+  const notificationRef = useRef<HTMLDivElement>(null);
+  const userContext = use(UserContext);
+
+  const { logout } = userContext;
 
   const context = use(ThemeContext);
   if (!context) {
@@ -54,20 +58,10 @@ const Header = () => {
 
   return (
     <header className={headerStyles.header}>
+      <button onClick={() => logout()}>logout</button>
       <Input {...searchInputProps} />
       <div className={headerStyles.headerIcons}>
         <ThemeSwitcher />
-        {/* <div
-          className={headerStyles.notificationContainer}
-          ref={notificationRef}
-          onClick={() => setShowPopupNotification((prev) => !prev)}
-        >
-          <NotificatonIcon className={headerStyles.notificationIcon} />
-          <div className={headerStyles.notificationNumber}>
-            <span>{Math.floor(Math.random() * 10) + 1}</span>
-          </div>
-          {showPopupNotification && <div className={headerStyles.notificationPopUp}></div>}
-        </div> */}
         <div className={headerStyles.notificationWrapper} ref={notificationRef}>
           <div className={headerStyles.notificationContainer} onClick={() => setShowPopupNotification((prev) => !prev)}>
             <NotificatonIcon className={headerStyles.notificationIcon} />
