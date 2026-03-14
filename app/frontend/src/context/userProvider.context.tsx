@@ -40,6 +40,7 @@ const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       (config) => {
         if (accessToken) {
           config.headers['Authorization'] = `Bearer ${accessToken}`;
+          setLoading(false);
         }
         return config;
       },
@@ -52,19 +53,21 @@ const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   }, [accessToken]);
 
   useEffect(() => {
-    const restoreSession = async () => {
-      const data = await refreshSession().catch(() => null);
+    if (!user) {
+      const restoreSession = async () => {
+        const data = await refreshSession().catch(() => null);
 
-      if (data?.user) {
-        setUser(data.user);
-        setAccessToken(data.accessToken);
-      }
+        if (data?.user) {
+          setUser(data.user);
+          setAccessToken(data.accessToken);
+        }
 
-      setLoading(false);
-    };
+        setLoading(false);
+      };
 
-    restoreSession();
-  }, []);
+      restoreSession();
+    }
+  }, [user]);
 
   console.log('user', user);
   console.log('accessToken', accessToken);

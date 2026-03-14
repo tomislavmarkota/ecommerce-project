@@ -22,22 +22,22 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<div>home</div>} />
-
+            <Route path="/login" element={<Login />} />
             {/* Protected “ADMIN” routes */}
             <Route element={<ProtectedRoute />}>
               <Route element={<AppContainer />}>
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/product" element={<Product />} />
+                <Route path="/product">
+                  <Route index element={<Product />} />
+                  <Route path="add-product" element={<AdminAddProduct />} />
+                </Route>
                 <Route path="/transaction" element={<Transaction />} />
                 <Route path="/customers" element={<Customers />} />
                 <Route path="/sales-report" element={<SalesReport />} />
                 <Route path="/account" element={<Account />} />
                 <Route path="/help" element={<Help />} />
-                <Route path="/add-product" element={<AdminAddProduct />} />
               </Route>
             </Route>
-
-            <Route path="/login" element={<Login />} />
           </Routes>
         </BrowserRouter>
       </ThemeProvider>
