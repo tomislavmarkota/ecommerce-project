@@ -7,6 +7,9 @@ import authRoutes from './routes/auth.routes';
 import googleRoutes from './routes/google.routes';
 import productRoutes from './routes/product.routes';
 import cookieParser from 'cookie-parser';
+import categoryRoutes from './routes/category.routes';
+import subcategoryRoutes from './routes/subcategory.routes';
+import userRoutes from './routes/user.routes';
 
 dotenv.config();
 
@@ -32,6 +35,9 @@ app.use(passport.session());
 app.use('/api/auth', authRoutes);
 app.use('/api/auth', googleRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/subcategories', subcategoryRoutes);
 
 app.get('/', (_, res) => res.status(200).send({ message: 'Welcome to Express + TS server' }));
 

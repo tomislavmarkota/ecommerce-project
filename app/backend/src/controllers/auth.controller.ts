@@ -125,54 +125,6 @@ export const logout = async (req: Request, res: Response) => {
   }
 };
 
-// export const refresh = async (req: Request, res: Response) => {
-//   const cookies = req.cookies;
-//   if (!cookies?.jwt) return res.sendStatus(401);
-
-//   const refreshToken = cookies.jwt;
-
-//   try {
-//     // Verify token
-//     const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string) as {
-//       userId: number;
-//       email: string;
-//     };
-
-//     // Check DB for valid token
-//     const [rows] = await pool.query(
-//       'SELECT id, email, role FROM users WHERE id = ? AND refresh_token = ?',
-//       [decoded.userId, refreshToken]
-//     );
-//     const users = rows as any[];
-//     if (users.length === 0) return res.status(403).json({ message: 'Forbidden' });
-
-//     const user = users[0];
-
-//     // Create new access token
-//     const accessToken = jwt.sign(
-//       {
-//         user: {
-//           id: user.id,
-//           email: user.email,
-//           role: user.role,
-//         },
-//       },
-//       process.env.ACCESS_TOKEN_SECRET as string,
-//       { expiresIn: '15m' },
-//     );
-
-//     // res.json({ accessToken });
-//     res.status(200).json({
-//       message: 'Refresh successful',
-//       accessToken,
-//       user: { id: user.id, email: user.email, role: user.role },
-//     });
-//   } catch (err) {
-//     console.error('Refresh error:', err);
-//     return res.status(403).json({ message: 'Forbidden' });
-//   }
-// };
-
 export const refresh = async (req: Request, res: Response) => {
   const cookies = req.cookies;
   if (!cookies?.jwt) return res.sendStatus(401);
