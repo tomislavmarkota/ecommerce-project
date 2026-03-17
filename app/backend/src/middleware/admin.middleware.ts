@@ -28,9 +28,16 @@ export interface AuthRequest extends Request {
 //     return res.status(401).json({ message: 'Invalid token' });
 //   }
 // };
+export interface AuthRequest extends Request {
+  user?: {
+    id: number;
+    role: string;
+  };
+}
 
 export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
+  console.log('authHeader', authHeader);
   if (!authHeader) return res.status(401).json({ message: 'Missing token' });
 
   const token = authHeader.split(' ')[1];
@@ -38,14 +45,19 @@ export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction
 
   try {
     const decoded: any = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET!);
-    req.user = decoded;
-
+    //req.user = decoded;
+    console.log('req.user', decoded);
     // ✅ Access role properly depending on JWT payload
     const role = decoded.user?.role || decoded.role;
     console.log(role);
-    if (role !== 'admin') {
+    if (role !== 'admin' && role !== 'superAdmin') {
       return res.status(403).json({ message: 'Forbidden: Admins only' });
     }
+
+    req.user = {
+      id: decoded.user.id,
+      role: decoded.user.role,
+    };
 
     next();
   } catch (err) {

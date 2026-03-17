@@ -6,7 +6,7 @@ import { refreshSession } from '../utils/refreshManager';
 
 interface User {
   email: string;
-  role: 'admin' | 'user' | 'editor';
+  role: 'admin' | 'user' | 'editor' | 'superAdmin';
 }
 
 interface UserContextType {
@@ -44,7 +44,7 @@ const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         }
         return config;
       },
-      (error) => Promise.reject(error)
+      (error) => Promise.reject(error),
     );
 
     return () => {

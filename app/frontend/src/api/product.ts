@@ -15,11 +15,52 @@ export const addProduct = async (product: ProductInput) => {
   return response.data;
 };
 
-export const fetchProducts = async () => {
-  try {
-    const res = await api.get('/products');
-    return res;
-  } catch (err: any) {
-    return err;
-  }
+export type FetchProductsParams = {
+  pageIndex: number;
+  pageSize: number;
+  globalFilter?: string;
+  sorting?: {
+    id: string;
+    desc: boolean;
+  }[];
+};
+
+export type ProductRow = {
+  id: number;
+  name: string;
+  price: number;
+  stock: number;
+  is_published: boolean;
+  created_at: string;
+  category_name: string | null;
+  subcategory_name: string | null;
+  thumbnail: string | null;
+};
+
+export type ProductsResponse = {
+  data: ProductRow[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
+
+export const fetchProducts = async ({
+  pageIndex,
+  pageSize,
+  globalFilter = '',
+  sorting = [],
+}: FetchProductsParams): Promise<ProductsResponse> => {
+  const sort = sorting[0];
+
+  const params = {
+    page: pageIndex + 1,
+    limit: pageSize,
+    search: globalFilter || undefined,
+    sortBy: sort?.id || 'created_at',
+    sortOrder: sort?.desc ? 'DESC' : 'ASC',
+  };
+
+  const res = await api.get('/products', { params });
+  return res.data;
 };

@@ -1,0 +1,45 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.defaultBadge {
+  color: #46506b;
+  background: #edf1f7;
+}
+
+.admin,
+.fulfilled,
+.paid,
+.instock {
+  color: #0f5132;
+  background: #d1e7dd;
+}
+
+.superadmin,
+.pending,
+.partialfulfilled,
+.readytopickup {
+  color: #664d03;
+  background: #fff3cd;
+}
+
+.user,
+.unfulfilled {
+  color: #084298;
+  background: #cfe2ff;
+}
+
+.cancelled,
+.outofstock {
+  color: #842029;
+  background: #f8d7da;
+}

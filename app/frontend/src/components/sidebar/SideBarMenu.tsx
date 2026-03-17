@@ -27,9 +27,9 @@ type Icons = {
 
 const generalIcons: Icons = [
   { id: 1, component: DashboardIcon, name: 'Dashboard', route: '/dashboard' },
-  { id: 2, component: StoreIcon, name: 'Product', route: '/product' },
+  { id: 2, component: StoreIcon, name: 'Products', route: '/product' },
   { id: 3, component: TransactionIcon, name: 'Transaction', route: '/transaction' },
-  { id: 4, component: CustomersIcon, name: 'Customers', route: '/customers' },
+  { id: 4, component: CustomersIcon, name: 'Customers', route: '/users' },
   { id: 5, component: SalesReportIcon, name: 'Sales report', route: '/sales-report' },
 ];
 const toolsIcons: Icons = [

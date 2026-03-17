@@ -9,7 +9,9 @@ const ProtectedRoute = () => {
     return <div>Loading...</div>; // or a spinner
   }
 
-  if (!user || user.role !== 'admin') {
+  const allowedRoles = ['admin', 'superAdmin'];
+
+  if (!user || !allowedRoles.includes(user.role)) {
     return <Navigate to="/login" replace />;
   }
 

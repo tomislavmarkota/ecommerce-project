@@ -5,10 +5,10 @@ import { requireAdmin } from '../middleware/admin.middleware';
 const router = Router();
 
 // Public: fetch all products
-router.get('/', requireAdmin, getProducts);
+router.get('/', getProducts);
 
 // Admin only: add product
 // router.post('/add-product', requireAdmin, addProduct);
-router.post('/add-product', addProduct);
+router.post('/add-product', requireAdmin, addProduct);
 
 export default router;

@@ -10,6 +10,7 @@ import cookieParser from 'cookie-parser';
 import categoryRoutes from './routes/category.routes';
 import subcategoryRoutes from './routes/subcategory.routes';
 import userRoutes from './routes/user.routes';
+import rolesRouter from './routes/roles.routes';
 
 dotenv.config();
 
@@ -38,6 +39,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/subcategories', subcategoryRoutes);
+app.use('/api/roles', rolesRouter);
 
 app.get('/', (_, res) => res.status(200).send({ message: 'Welcome to Express + TS server' }));
 

@@ -2,14 +2,11 @@ import { use, useEffect, useRef, useState } from 'react';
 import { ThemeContext } from '../../../context/themeProvider.context';
 import ThemeSwitcher from '../../../components/themeSwitcher/ThemeSwitcher';
 import headerStyles from './header.module.scss';
-import Input, { InputType } from '../../../components/input/Input';
-import SearchIcon from '../../../assets/search.svg?react';
 import NotificatonIcon from '../../../assets/notification.svg?react';
 import profileImage from '../../../assets/Rectangle 20.png';
 import { UserContext } from '../../../context/userProvider.context';
 
 const Header = () => {
-  const [search, setSearch] = useState('');
   const [showPopupNotification, setShowPopupNotification] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const userContext = use(UserContext);
@@ -20,7 +17,6 @@ const Header = () => {
   if (!context) {
     throw new Error('Header must be used within a ThemeProvider');
   }
-  console.log('Header re-rendered'); // To observe re-renders
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -41,25 +37,9 @@ const Header = () => {
     };
   }, [showPopupNotification]);
 
-  const searchInputProps: InputType = {
-    inputProps: {
-      //className: headerStyles.searchInput,
-      type: 'input',
-      placeholder: 'Search product',
-      name: 'password',
-      required: true,
-      value: search,
-      onChange: (e) => setSearch(e.target.value),
-    },
-    iconComponent: SearchIcon,
-  };
-
-  console.log(showPopupNotification);
-
   return (
     <header className={headerStyles.header}>
       <button onClick={() => logout()}>logout</button>
-      <Input {...searchInputProps} />
       <div className={headerStyles.headerIcons}>
         <ThemeSwitcher />
         <div className={headerStyles.notificationWrapper} ref={notificationRef}>
