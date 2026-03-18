@@ -1,3 +1,4 @@
+import { ResultSetHeader } from 'mysql2';
 import { pool } from '../config/db';
 import { buildUserQuery } from '../utils/queryBuilder';
 
@@ -121,4 +122,14 @@ export const updateUser = async (id: number, data: any, currentUserRole: string)
   );
 
   return rows[0];
+};
+
+export const deleteUsersByIds = async (ids: number[]) => {
+  const placeholders = ids.map(() => '?').join(', ');
+
+  const [result] = await pool.query<ResultSetHeader>(`DELETE FROM users WHERE id IN (${placeholders})`, ids);
+
+  return {
+    deletedCount: result.affectedRows,
+  };
 };

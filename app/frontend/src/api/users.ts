@@ -1,8 +1,7 @@
 import axios from 'axios';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export const getUsers = async ({ page, limit, search, sorting }: any) => {
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
@@ -21,4 +20,19 @@ export const getUsers = async ({ page, limit, search, sorting }: any) => {
   }
 
   return res.data;
+};
+
+export const deleteUsers = async (ids: number[], token: string) => {
+  const res = await axios.delete(`${API_URL}/api/users/bulk`, {
+    data: { ids },
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.data as {
+    message: string;
+    deletedCount: number;
+    ids: number[];
+  };
 };

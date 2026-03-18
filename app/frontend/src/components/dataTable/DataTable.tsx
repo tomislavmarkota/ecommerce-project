@@ -1,44 +1,42 @@
 import {
   ColumnDef,
   PaginationState,
+  RowSelectionState,
   SortingState,
   Updater,
   flexRender,
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table';
+import { useEffect, useMemo, useState } from 'react';
 import DebouncedInput from './DebouncedInput';
 import styles from './DataTable.module.scss';
 
 type DataTableProps<TData extends object> = {
   data: TData[];
   columns: ColumnDef<TData, any>[];
-
   title?: string;
   subtitle?: string;
-
   isLoading?: boolean;
   emptyMessage?: string;
-
   globalFilter?: string;
   onGlobalFilterChange?: (value: string) => void;
   searchPlaceholder?: string;
-
-  sorting?: SortingState;
-  onSortingChange?: (updater: Updater<SortingState>) => void;
-  manualSorting?: boolean;
-
-  pagination?: PaginationState;
-  onPaginationChange?: (updater: Updater<PaginationState>) => void;
-  manualPagination?: boolean;
-  pageCount?: number;
+  sorting: SortingState;
+  onSortingChange: (updater: Updater<SortingState>) => void;
+  pagination: PaginationState;
+  onPaginationChange: (updater: Updater<PaginationState>) => void;
+  pageCount: number;
   totalRows?: number;
   pageSizeOptions?: number[];
-
   onRowClick?: (row: TData) => void;
-
   showToolbar?: boolean;
   showFooter?: boolean;
+  enableRowSelection?: boolean;
+  getRowId?: (row: TData, index: number) => string;
+  onSelectedRowsChange?: (rows: TData[]) => void;
+  renderBulkActions?: (selectedRows: TData[]) => React.ReactNode;
+  resetRowSelectionKey?: string | number;
 };
 
 export default function DataTable<TData extends object>({
@@ -51,43 +49,112 @@ export default function DataTable<TData extends object>({
   globalFilter = '',
   onGlobalFilterChange,
   searchPlaceholder = 'Search...',
-  sorting = [],
+  sorting,
   onSortingChange,
-  manualSorting = false,
   pagination,
   onPaginationChange,
-  manualPagination = false,
   pageCount,
   totalRows,
   pageSizeOptions = [10, 20, 30, 40, 50],
   onRowClick,
   showToolbar = true,
   showFooter = true,
+  enableRowSelection = false,
+  getRowId,
+  onSelectedRowsChange,
+  renderBulkActions,
+  resetRowSelectionKey,
 }: DataTableProps<TData>) {
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+  const selectionColumn = useMemo<ColumnDef<TData, any>>(
+    () => ({
+      id: '__select',
+      header: ({ table }) => (
+        <div className={styles.checkboxWrap} onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={table.getIsAllPageRowsSelected()}
+            ref={(el) => {
+              if (el) {
+                el.indeterminate = table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected();
+              }
+            }}
+            onChange={table.getToggleAllPageRowsSelectedHandler()}
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className={styles.checkboxWrap} onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={row.getIsSelected()}
+            disabled={!row.getCanSelect()}
+            onChange={row.getToggleSelectedHandler()}
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableColumnFilter: false,
+      size: 48,
+    }),
+    [],
+  );
+
+  const tableColumns = useMemo(
+    () => (enableRowSelection ? [selectionColumn, ...columns] : columns),
+    [enableRowSelection, selectionColumn, columns],
+  );
+
   const table = useReactTable({
     data,
-    columns,
+    columns: tableColumns,
     state: {
       sorting,
+      pagination,
       globalFilter,
-      ...(pagination ? { pagination } : {}),
+      ...(enableRowSelection ? { rowSelection } : {}),
     },
     onSortingChange,
-    ...(onPaginationChange ? { onPaginationChange } : {}),
-    manualSorting,
-    manualPagination,
-    ...(typeof pageCount === 'number' ? { pageCount } : {}),
+    onPaginationChange,
+    ...(getRowId ? { getRowId } : {}),
+    onRowSelectionChange: enableRowSelection ? setRowSelection : undefined,
+    enableRowSelection,
+    manualSorting: true,
+    manualPagination: true,
+    pageCount,
     getCoreRowModel: getCoreRowModel(),
   });
 
-  const colSpan = columns.length;
-  const resolvedPageCount = pageCount ?? table.getPageCount();
+  const selectedRows = useMemo(
+    () => table.getSelectedRowModel().rows.map((row) => row.original),
+    [rowSelection, data, table],
+  );
+
+  useEffect(() => {
+    if (enableRowSelection) {
+      setRowSelection({});
+    }
+  }, [resetRowSelectionKey, enableRowSelection]);
+
+  useEffect(() => {
+    if (!onSelectedRowsChange) return;
+    onSelectedRowsChange(selectedRows);
+  }, [onSelectedRowsChange, selectedRows]);
+
+  const selectedCount = selectedRows.length;
+
+  useEffect(() => {
+    onSelectedRowsChange?.(selectedRows);
+  }, [onSelectedRowsChange, selectedRows]);
+
+  const colSpan = tableColumns.length;
 
   return (
     <div className={styles.card}>
-      {(showToolbar || title) && (
+      {/* {(showToolbar || title) && (
         <div className={styles.cardHeader}>
-          <div>
+          <div className={styles.headerMeta}>
             {title && <h3 className={styles.cardTitle}>{title}</h3>}
             {subtitle && <p className={styles.cardSubtitle}>{subtitle}</p>}
             {!subtitle && typeof totalRows === 'number' && (
@@ -95,9 +162,99 @@ export default function DataTable<TData extends object>({
             )}
           </div>
 
-          {showToolbar && onGlobalFilterChange && (
-            <DebouncedInput value={globalFilter} onChange={onGlobalFilterChange} placeholder={searchPlaceholder} />
-          )}
+          <div className={styles.headerActions}>
+            {enableRowSelection && (
+              <div className={styles.selectionSummary}>
+                Selected: <strong>{selectedCount}</strong>
+              </div>
+            )}
+
+            {enableRowSelection && renderBulkActions && (
+              <div
+                className={`${styles.bulkActionsInline} ${
+                  selectedCount > 0 ? styles.bulkActionsInlineVisible : styles.bulkActionsInlineHidden
+                }`}
+              >
+                {selectedCount > 0 ? renderBulkActions(selectedRows) : null}
+              </div>
+            )}
+
+            {showToolbar && onGlobalFilterChange && (
+              <DebouncedInput value={globalFilter} onChange={onGlobalFilterChange} placeholder={searchPlaceholder} />
+            )}
+          </div>
+        </div>
+      )} */}
+
+      {/* {(showToolbar || title) && (
+        <div className={styles.cardHeader}>
+          <div className={styles.headerMeta}>
+            {title && <h3 className={styles.cardTitle}>{title}</h3>}
+            {subtitle && <p className={styles.cardSubtitle}>{subtitle}</p>}
+            {!subtitle && typeof totalRows === 'number' && (
+              <p className={styles.cardSubtitle}>{totalRows} total records</p>
+            )}
+          </div>
+
+          <div className={styles.headerSearch}>
+            {showToolbar && onGlobalFilterChange && (
+              <DebouncedInput value={globalFilter} onChange={onGlobalFilterChange} placeholder={searchPlaceholder} />
+            )}
+          </div>
+
+          <div className={styles.headerRight}>
+            {enableRowSelection && renderBulkActions && (
+              <div
+                className={`${styles.bulkActionsInline} ${
+                  selectedCount > 0 ? styles.bulkActionsInlineVisible : styles.bulkActionsInlineHidden
+                }`}
+              >
+                {selectedCount > 0 ? renderBulkActions(selectedRows) : null}
+              </div>
+            )}
+
+            {enableRowSelection && (
+              <div className={styles.selectionSummary}>
+                Selected: <strong>{selectedCount}</strong>
+              </div>
+            )}
+          </div>
+        </div>
+      )} */}
+
+      {(showToolbar || title) && (
+        <div className={styles.cardHeader}>
+          <div className={styles.headerMeta}>
+            {title && <h3 className={styles.cardTitle}>{title}</h3>}
+            {subtitle && <p className={styles.cardSubtitle}>{subtitle}</p>}
+            {!subtitle && typeof totalRows === 'number' && (
+              <p className={styles.cardSubtitle}>{totalRows} total records</p>
+            )}
+          </div>
+
+          <div className={styles.headerSearch}>
+            {showToolbar && onGlobalFilterChange && (
+              <DebouncedInput value={globalFilter} onChange={onGlobalFilterChange} placeholder={searchPlaceholder} />
+            )}
+          </div>
+
+          <div className={styles.headerRight}>
+            {enableRowSelection && renderBulkActions && (
+              <div
+                className={`${styles.bulkActionsInline} ${
+                  selectedCount > 0 ? styles.bulkActionsInlineVisible : styles.bulkActionsInlineHidden
+                }`}
+              >
+                {selectedCount > 0 ? renderBulkActions(selectedRows) : null}
+              </div>
+            )}
+
+            {enableRowSelection && (
+              <div className={styles.selectionSummary}>
+                Selected: <strong>{selectedCount}</strong>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -153,7 +310,9 @@ export default function DataTable<TData extends object>({
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className={`${styles.tableRow} ${onRowClick ? styles.clickable : ''}`}
+                  className={`${styles.tableRow} ${onRowClick ? styles.clickable : ''} ${
+                    row.getIsSelected() ? styles.selectedRow : ''
+                  }`}
                   onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -166,10 +325,10 @@ export default function DataTable<TData extends object>({
         </table>
       </div>
 
-      {showFooter && pagination && onPaginationChange && resolvedPageCount > 0 && (
+      {showFooter && pageCount > 0 && (
         <div className={styles.footer}>
           <div className={styles.footerInfo}>
-            Page <strong>{pagination.pageIndex + 1}</strong> of <strong>{resolvedPageCount}</strong>
+            Page <strong>{pagination.pageIndex + 1}</strong> of <strong>{pageCount}</strong>
           </div>
 
           <div className={styles.footerControls}>
@@ -198,7 +357,7 @@ export default function DataTable<TData extends object>({
               Next
             </button>
 
-            <button onClick={() => table.setPageIndex(resolvedPageCount - 1)} disabled={!table.getCanNextPage()}>
+            <button onClick={() => table.setPageIndex(pageCount - 1)} disabled={!table.getCanNextPage()}>
               Last
             </button>
 

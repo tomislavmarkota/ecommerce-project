@@ -24,6 +24,32 @@
   background: #d1e7dd;
 }
 
+.page {
+  display: grid;
+  gap: 24px;
+}
+
+.dangerButton {
+  min-width: 130px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: #dc3545;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
 .superadmin,
 .pending,
 .partialfulfilled,

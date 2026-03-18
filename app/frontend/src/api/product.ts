@@ -64,3 +64,15 @@ export const fetchProducts = async ({
   const res = await api.get('/products', { params });
   return res.data;
 };
+
+export const deleteProducts = async (ids: number[]) => {
+  const res = await api.delete('/products/bulk', {
+    data: { ids },
+  });
+
+  return res.data as {
+    message: string;
+    deletedCount: number;
+    ids: number[];
+  };
+};

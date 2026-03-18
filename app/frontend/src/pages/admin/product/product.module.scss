@@ -135,6 +135,18 @@
   font-size: 0.82rem;
 }
 
+.dangerButton {
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: #dc3545;
+  color: #fff;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;

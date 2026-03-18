@@ -6,6 +6,7 @@ import DashboardIcon from '../../assets/dashboard.svg?react';
 import StoreIcon from '../../assets/store.svg?react';
 import TransactionIcon from '../../assets/transaction.svg?react';
 import CustomersIcon from '../../assets/customers.svg?react';
+import OrdersIcon from '../../assets/orders.svg?react';
 import SalesReportIcon from '../../assets/salesReport.svg?react';
 import AccountIcon from '../../assets/account.svg?react';
 import HelpIcon from '../../assets/help.svg?react';
@@ -28,9 +29,10 @@ type Icons = {
 const generalIcons: Icons = [
   { id: 1, component: DashboardIcon, name: 'Dashboard', route: '/dashboard' },
   { id: 2, component: StoreIcon, name: 'Products', route: '/product' },
-  { id: 3, component: TransactionIcon, name: 'Transaction', route: '/transaction' },
-  { id: 4, component: CustomersIcon, name: 'Customers', route: '/users' },
-  { id: 5, component: SalesReportIcon, name: 'Sales report', route: '/sales-report' },
+  { id: 3, component: OrdersIcon, name: 'Orders', route: '/orders' },
+  { id: 4, component: TransactionIcon, name: 'Transaction', route: '/transaction' },
+  { id: 5, component: CustomersIcon, name: 'Customers', route: '/users' },
+  { id: 6, component: SalesReportIcon, name: 'Sales report', route: '/sales-report' },
 ];
 const toolsIcons: Icons = [
   { id: 1, component: AccountIcon, name: 'Account & Settings', route: '/account' },

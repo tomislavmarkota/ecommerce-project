@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 
 import * as userService from '../services/users.service';
 import { AuthRequest } from '../middleware/admin.middleware';
+import { deleteUsersByIds } from '../services/users.service';
 
 export const getUsers = async (req: Request, res: Response) => {
   try {
@@ -73,5 +74,44 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
     res.status(500).json({
       message: 'Server error',
     });
+  }
+};
+
+export const deleteUsersBulk = async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'superAdmin') {
+      return res.status(403).json({ message: 'Only superAdmin can delete users' });
+    }
+
+    const { ids } = req.body as { ids?: number[] };
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'User ids are required' });
+    }
+
+    const normalizedIds = [...new Set(ids)].map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+
+    if (normalizedIds.length === 0) {
+      return res.status(400).json({ message: 'No valid user ids provided' });
+    }
+
+    const currentUserId = req.user?.id;
+
+    if (currentUserId && normalizedIds.includes(currentUserId)) {
+      return res.status(400).json({
+        message: 'You cannot delete your own account',
+      });
+    }
+
+    const result = await deleteUsersByIds(normalizedIds);
+
+    return res.status(200).json({
+      message: 'Users deleted successfully',
+      deletedCount: result.deletedCount,
+      ids: normalizedIds,
+    });
+  } catch (err) {
+    console.error('Bulk delete users error:', err);
+    return res.status(500).json({ message: 'Failed to delete users' });
   }
 };

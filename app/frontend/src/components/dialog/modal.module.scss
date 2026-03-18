@@ -1,0 +1,95 @@
+.dialog {
+  border: none;
+  padding: 0;
+  border-radius: 16px;
+  width: 100%;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+
+  &::backdrop {
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(2px);
+  }
+}
+
+.sm {
+  max-width: 420px;
+}
+
+.md {
+  max-width: 520px;
+}
+
+.lg {
+  max-width: 720px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 24px 24px 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--phoenix-heading, #141824);
+}
+
+.body {
+  padding: 20px 24px 24px;
+  color: var(--phoenix-text, #31374a);
+}
+
+.message {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--phoenix-text-muted, #6e7891);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 24px 24px;
+}
+
+.button {
+  min-width: 110px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+}
+
+.secondaryButton {
+  border-color: #d7dce5;
+  background: #fff;
+  color: var(--phoenix-text, #31374a);
+}
+
+.primaryButton {
+  background: var(--phoenix-primary, #3874ff);
+  color: #fff;
+}
+
+.dangerButton {
+  background: #dc3545;
+  color: #fff;
+}

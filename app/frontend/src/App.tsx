@@ -15,6 +15,7 @@ const Account = lazy(() => import('./pages/admin/account/Account'));
 const Help = lazy(() => import('./pages/admin/help/Help'));
 const AdminAddProduct = lazy(() => import('./pages/admin/addProduct/AddProduct'));
 const UserDetailsPage = lazy(() => import('./pages/admin/userDetails/UserDetails'));
+const OrdersPage = lazy(() => import('./pages/admin/orders/Orders'));
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
                   <Route path="add-product" element={<AdminAddProduct />} />
                 </Route>
                 <Route path="/transaction" element={<Transaction />} />
+                <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/users" element={<Customers />} />
                 <Route path="/users/:id" element={<UserDetailsPage />} />
                 <Route path="/sales-report" element={<SalesReport />} />

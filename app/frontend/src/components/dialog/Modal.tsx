@@ -1,23 +1,26 @@
 import { useEffect, useRef } from 'react';
+import styles from './Modal.module.scss';
 
 type ModalProps = {
   open: boolean;
-  title: string;
-  onSubmit: () => void;
   onClose: () => void;
-  submitLabel?: string;
-  cancelLabel?: string;
+  title?: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
+  maxWidth?: 'sm' | 'md' | 'lg';
+  closeOnBackdrop?: boolean;
+  closeOnEscape?: boolean;
 };
 
 export function Modal({
   open,
-  title,
-  onSubmit,
   onClose,
-  submitLabel = 'Save',
-  cancelLabel = 'Cancel',
+  title,
   children,
+  footer,
+  maxWidth = 'md',
+  closeOnBackdrop = true,
+  closeOnEscape = true,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -25,9 +28,11 @@ export function Modal({
     const dialog = dialogRef.current;
     if (!dialog) return;
 
-    if (open) {
+    if (open && !dialog.open) {
       dialog.showModal();
-    } else {
+    }
+
+    if (!open && dialog.open) {
       dialog.close();
     }
   }, [open]);
@@ -37,15 +42,21 @@ export function Modal({
     if (!dialog) return;
 
     const handleCancel = (e: Event) => {
-      e.preventDefault(); // prevent default close so we control state
+      if (!closeOnEscape) {
+        e.preventDefault();
+        return;
+      }
+
+      e.preventDefault();
       onClose();
     };
 
     dialog.addEventListener('cancel', handleCancel);
     return () => dialog.removeEventListener('cancel', handleCancel);
-  }, [onClose]);
+  }, [onClose, closeOnEscape]);
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDialogElement>) => {
+    if (!closeOnBackdrop) return;
     if (e.target === dialogRef.current) {
       onClose();
     }
@@ -54,55 +65,22 @@ export function Modal({
   return (
     <dialog
       ref={dialogRef}
+      className={`${styles.dialog} ${styles[maxWidth]}`}
       onClick={handleBackdropClick}
-      style={{
-        border: 'none',
-        borderRadius: '12px',
-        padding: 0,
-        maxWidth: '480px',
-        width: '100%',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-        background: '#fff',
-      }}
+      aria-labelledby={title ? 'modal-title' : undefined}
     >
-      <div style={{ padding: '28px 28px 20px' }}>
-        <h2 style={{ margin: '0 0 20px', fontSize: '1.2rem', fontWeight: 600 }}>{title}</h2>
+      <div className={styles.content}>
+        {title && (
+          <div className={styles.header}>
+            <h2 id="modal-title" className={styles.title}>
+              {title}
+            </h2>
+          </div>
+        )}
 
-        {children}
+        <div className={styles.body}>{children}</div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              padding: '8px 18px',
-              borderRadius: '7px',
-              border: '1px solid #d1d5db',
-              background: '#fff',
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-            }}
-          >
-            {cancelLabel}
-          </button>
-
-          <button
-            type="button"
-            onClick={onSubmit}
-            style={{
-              padding: '8px 18px',
-              borderRadius: '7px',
-              border: 'none',
-              background: '#2563eb',
-              color: '#fff',
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-              fontWeight: 500,
-            }}
-          >
-            {submitLabel}
-          </button>
-        </div>
+        {footer && <div className={styles.footer}>{footer}</div>}
       </div>
     </dialog>
   );
