@@ -11,6 +11,9 @@ import categoryRoutes from './routes/category.routes';
 import subcategoryRoutes from './routes/subcategory.routes';
 import userRoutes from './routes/user.routes';
 import rolesRouter from './routes/roles.routes';
+import catalogRouter from './routes/catalog.routes';
+import checkoutRouter from './routes/checkout.routes';
+import orderRouter from './routes/order.routes';
 
 dotenv.config();
 
@@ -36,10 +39,13 @@ app.use(passport.session());
 app.use('/api/auth', authRoutes);
 app.use('/api/auth', googleRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/catalog', catalogRouter);
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/subcategories', subcategoryRoutes);
 app.use('/api/roles', rolesRouter);
+app.use('/api/checkout', checkoutRouter);
+app.use('/api/orders', orderRouter);
 
 app.get('/', (_, res) => res.status(200).send({ message: 'Welcome to Express + TS server' }));
 

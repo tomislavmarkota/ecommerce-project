@@ -22,6 +22,7 @@ function Product() {
   const [selectedProducts, setSelectedProducts] = useState<ProductRow[]>([]);
   const [selectionResetKey, setSelectionResetKey] = useState(0);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
   const { data, isLoading } = useProducts(pagination, globalFilter, sorting);
   const deleteProductsMutation = useDeleteProducts();
 
@@ -35,20 +36,16 @@ function Product() {
     }));
   }, [globalFilter]);
 
-  const handleDeleteSelected = async () => {
+  const handleConfirmDelete = async () => {
     const ids = selectedProducts.map((product) => product.id);
-
-    if (ids.length === 0) return;
-
-    const confirmed = window.confirm(`Delete ${ids.length} selected product(s)?`);
-    if (!confirmed) return;
+    if (!ids.length) return;
 
     try {
       await deleteProductsMutation.mutateAsync(ids);
       setSelectedProducts([]);
       setSelectionResetKey((prev) => prev + 1);
+      setDeleteModalOpen(false);
 
-      // optional: if current page becomes empty after delete, move back one page
       if (products.length === ids.length && pagination.pageIndex > 0) {
         setPagination((prev) => ({
           ...prev,
@@ -56,8 +53,7 @@ function Product() {
         }));
       }
     } catch (error) {
-      console.error(error);
-      alert('Failed to delete selected products');
+      console.error('Failed to delete products:', error);
     }
   };
 
@@ -108,29 +104,11 @@ function Product() {
         )}
         onRowClick={(row) => navigate(`/product/${row.id}`)}
       />
+
       <ConfirmModal
         open={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        onConfirm={async () => {
-          const ids = selectedProducts.map((product) => product.id);
-          if (ids.length === 0) return;
-
-          try {
-            await deleteProductsMutation.mutateAsync(ids);
-            setSelectedProducts([]);
-            setSelectionResetKey((prev) => prev + 1);
-            setDeleteModalOpen(false);
-
-            if (products.length === ids.length && pagination.pageIndex > 0) {
-              setPagination((prev) => ({
-                ...prev,
-                pageIndex: prev.pageIndex - 1,
-              }));
-            }
-          } catch (error) {
-            console.error(error);
-          }
-        }}
+        onClose={() => !deleteProductsMutation.isPending && setDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
         isLoading={deleteProductsMutation.isPending}
         title="Delete selected products"
         confirmLabel={`Delete (${selectedProducts.length})`}
@@ -139,7 +117,7 @@ function Product() {
         message={
           <>
             Are you sure you want to delete <strong>{selectedProducts.length}</strong> selected product
-            {selectedProducts.length === 1 ? '' : 's'}? This action cannot be undone.
+            {selectedProducts.length === 1 ? '' : 's'}?
           </>
         }
       />

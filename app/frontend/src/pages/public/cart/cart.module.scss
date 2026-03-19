@@ -1,0 +1,127 @@
+.page {
+  display: grid;
+  gap: 24px;
+}
+
+.header,
+.summary,
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.list {
+  display: grid;
+  gap: 16px;
+}
+
+.item {
+  padding: 16px;
+  border: 1px solid var(--phoenix-border, #e6e9ef);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.itemInfo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+
+  h3,
+  p {
+    margin: 0;
+  }
+
+  p {
+    color: var(--phoenix-text-muted, #6e7891);
+  }
+}
+
+.thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f8fafd;
+}
+
+.thumbImage,
+.thumbPlaceholder {
+  width: 100%;
+  height: 100%;
+}
+
+.thumbImage {
+  object-fit: cover;
+}
+
+.thumbPlaceholder {
+  display: grid;
+  place-items: center;
+  color: #6e7891;
+}
+
+.itemActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.qtyInput {
+  width: 80px;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid #d7dce5;
+  border-radius: 10px;
+}
+
+.removeButton,
+.clearButton,
+.linkButton,
+.checkoutButton {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.removeButton,
+.clearButton,
+.linkButton {
+  background: #fff;
+  border-color: #d7dce5;
+  color: var(--phoenix-text, #31374a);
+  text-decoration: none;
+}
+
+.checkoutButton {
+  background: var(--phoenix-primary, #3874ff);
+  color: #fff;
+}
+
+.summary {
+  padding: 20px;
+  border: 1px solid var(--phoenix-border, #e6e9ef);
+  border-radius: 16px;
+  background: #fff;
+
+  span {
+    display: block;
+    color: var(--phoenix-text-muted, #6e7891);
+  }
+
+  strong {
+    font-size: 1.2rem;
+    color: var(--phoenix-heading, #141824);
+  }
+}
+
+.empty {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+}

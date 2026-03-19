@@ -2,12 +2,15 @@ import { ColumnDef } from '@tanstack/react-table';
 import { ProductRow } from '../../../api/product';
 import styles from './Product.module.scss';
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('en-US', {
+const formatCurrency = (value: number | null) => {
+  if (value == null) return '-';
+
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
+    currency: 'EUR',
+    maximumFractionDigits: 2,
   }).format(value);
+};
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleDateString('en-US', {
@@ -45,9 +48,14 @@ export const productColumns: ColumnDef<ProductRow>[] = [
     },
   },
   {
-    accessorKey: 'price',
-    header: 'Price',
-    cell: ({ getValue }) => formatCurrency(getValue() as number),
+    accessorKey: 'b2c_price_gross',
+    header: 'B2C price',
+    cell: ({ getValue }) => formatCurrency(getValue() as number | null),
+  },
+  {
+    accessorKey: 'b2b_price_gross',
+    header: 'B2B price',
+    cell: ({ getValue }) => formatCurrency(getValue() as number | null),
   },
   {
     accessorKey: 'stock',

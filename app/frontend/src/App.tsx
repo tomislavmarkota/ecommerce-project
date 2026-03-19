@@ -1,10 +1,18 @@
-import { lazy } from 'react';
+import { lazy, Suspense } from 'react';
 import { ThemeProvider } from './context/themeProvider.context';
 import { BrowserRouter, Route, Routes } from 'react-router';
 import { UserProvider } from './context/userProvider.context';
+import { CartProvider } from './context/cartProvider.context';
 import ProtectedRoute from './routes/protectedRoute';
 import Login from './pages/admin/login/Login';
 import AppContainer from './pages/appContainer/AppContainer';
+import PublicLayout from './pages/public/publicLayout/publicLayout';
+
+const Home = lazy(() => import('./pages/public/products/PublicProducts'));
+const PublicProducts = lazy(() => import('./pages/public/products/PublicProducts'));
+const PublicProductDetails = lazy(() => import('./pages/public/productDetails/PublicProductDetails'));
+const CartPage = lazy(() => import('./pages/public/cart/Cart'));
+const CheckoutPage = lazy(() => import('./pages/public/checkout/Checkout'));
 
 const Dashboard = lazy(() => import('./pages/admin/dashboard/Dashboard'));
 const Product = lazy(() => import('./pages/admin/product/Product'));
@@ -20,31 +28,42 @@ const OrdersPage = lazy(() => import('./pages/admin/orders/Orders'));
 function App() {
   return (
     <UserProvider>
-      <ThemeProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<div>home</div>} />
-            <Route path="/login" element={<Login />} />
-            {/* Protected “ADMIN” routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route element={<AppContainer />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/product">
-                  <Route index element={<Product />} />
-                  <Route path="add-product" element={<AdminAddProduct />} />
+      <CartProvider>
+        <ThemeProvider>
+          <BrowserRouter>
+            <Suspense fallback={<div>Loading...</div>}>
+              <Routes>
+                <Route element={<PublicLayout />}>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/products" element={<PublicProducts />} />
+                  <Route path="/products/:id" element={<PublicProductDetails />} />
+                  <Route path="/cart" element={<CartPage />} />
+                  <Route path="/checkout" element={<CheckoutPage />} />
                 </Route>
-                <Route path="/transaction" element={<Transaction />} />
-                <Route path="/orders" element={<OrdersPage />} />
-                <Route path="/users" element={<Customers />} />
-                <Route path="/users/:id" element={<UserDetailsPage />} />
-                <Route path="/sales-report" element={<SalesReport />} />
-                <Route path="/account" element={<Account />} />
-                <Route path="/help" element={<Help />} />
-              </Route>
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </ThemeProvider>
+
+                <Route path="/login" element={<Login />} />
+
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<AppContainer />}>
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/product">
+                      <Route index element={<Product />} />
+                      <Route path="add-product" element={<AdminAddProduct />} />
+                    </Route>
+                    <Route path="/transaction" element={<Transaction />} />
+                    <Route path="/orders" element={<OrdersPage />} />
+                    <Route path="/users" element={<Customers />} />
+                    <Route path="/users/:id" element={<UserDetailsPage />} />
+                    <Route path="/sales-report" element={<SalesReport />} />
+                    <Route path="/account" element={<Account />} />
+                    <Route path="/help" element={<Help />} />
+                  </Route>
+                </Route>
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </ThemeProvider>
+      </CartProvider>
     </UserProvider>
   );
 }

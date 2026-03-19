@@ -1,0 +1,151 @@
+.page {
+  display: grid;
+  gap: 24px;
+}
+
+.header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+
+  h1 {
+    margin: 0 0 6px;
+    color: var(--phoenix-heading, #141824);
+  }
+
+  p {
+    margin: 0;
+    color: var(--phoenix-text-muted, #6e7891);
+  }
+}
+
+.search {
+  width: 280px;
+  max-width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid #d7dce5;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 0.95rem;
+  outline: none;
+
+  &:focus {
+    border-color: rgba(56, 116, 255, 0.55);
+    box-shadow: 0 0 0 3px rgba(56, 116, 255, 0.12);
+  }
+}
+
+.empty {
+  padding: 32px;
+  border: 1px solid var(--phoenix-border, #e6e9ef);
+  border-radius: 16px;
+  background: #fff;
+  color: var(--phoenix-text-muted, #6e7891);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.card {
+  display: block;
+  text-decoration: none;
+  border: 1px solid var(--phoenix-border, #e6e9ef);
+  border-radius: 18px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: var(--phoenix-shadow, 0 0.25rem 1rem rgba(15, 23, 42, 0.05));
+}
+
+.imageWrap {
+  aspect-ratio: 1 / 1;
+  background: #f8fafd;
+}
+
+.image,
+.imagePlaceholder {
+  width: 100%;
+  height: 100%;
+}
+
+.image {
+  object-fit: cover;
+  display: block;
+}
+
+.imagePlaceholder {
+  display: grid;
+  place-items: center;
+  color: #6e7891;
+}
+
+.content {
+  padding: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.category {
+  font-size: 0.8rem;
+  color: var(--phoenix-text-muted, #6e7891);
+}
+
+.name {
+  margin: 0;
+  color: var(--phoenix-heading, #141824);
+  font-size: 1rem;
+}
+
+.priceRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.oldPrice {
+  color: #9aa4bf;
+  text-decoration: line-through;
+}
+
+.price {
+  color: var(--phoenix-heading, #141824);
+  font-weight: 700;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+
+  button {
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px solid #d7dce5;
+    background: #fff;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+@media (max-width: 992px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 576px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

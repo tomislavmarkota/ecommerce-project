@@ -4,10 +4,13 @@ import {
   createProduct,
   deleteProductsByIds,
   getProductsList,
+  updateProductPrices,
   validateSubcategoryBelongsToCategory,
 } from '../services/product.service';
 
-const ALLOWED_SORT_FIELDS = new Set(['id', 'name', 'price', 'stock', 'created_at', 'is_published']);
+const ALLOWED_SORT_FIELDS = new Set(['id', 'name', 'stock', 'created_at', 'is_published']);
+
+const isValidMoney = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 
 export const getProducts = async (req: Request, res: Response) => {
   try {
@@ -40,20 +43,16 @@ export const getProducts = async (req: Request, res: Response) => {
 
 export const addProduct = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, price, stock, categoryId, subcategoryId, images, isPublished } = req.body;
+    const { name, description, stock, categoryId, subcategoryId, images, isPublished, pricing } = req.body;
 
-    if (name == null || price == null || stock == null || categoryId == null) {
+    if (name == null || stock == null || categoryId == null || !pricing) {
       return res.status(400).json({
-        message: 'Name, price, stock, and categoryId are required',
+        message: 'Name, stock, categoryId and pricing are required',
       });
     }
 
     if (typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ message: 'Valid product name is required' });
-    }
-
-    if (typeof price !== 'number' || price < 0) {
-      return res.status(400).json({ message: 'Valid price is required' });
     }
 
     if (typeof stock !== 'number' || stock < 0) {
@@ -86,6 +85,19 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
       }
     }
 
+    if (
+      !pricing?.b2c ||
+      !pricing?.b2b ||
+      !isValidMoney(pricing.b2c.priceNet) ||
+      !isValidMoney(pricing.b2c.priceGross) ||
+      !isValidMoney(pricing.b2b.priceNet) ||
+      !isValidMoney(pricing.b2b.priceGross) ||
+      !isValidMoney(pricing.b2c.vatRate) ||
+      !isValidMoney(pricing.b2b.vatRate)
+    ) {
+      return res.status(400).json({ message: 'Valid B2C and B2B pricing is required' });
+    }
+
     const normalizedCategoryId = Number(categoryId);
     const normalizedSubcategoryId = subcategoryId != null && subcategoryId !== '' ? Number(subcategoryId) : null;
 
@@ -105,12 +117,24 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
     const result = await createProduct({
       name: name.trim(),
       description: typeof description === 'string' ? description : '',
-      price,
       stock,
       categoryId: normalizedCategoryId,
       subcategoryId: normalizedSubcategoryId,
       images: Array.isArray(images) ? images : [],
       isPublished: Boolean(isPublished),
+      pricing: {
+        currency: pricing.currency || 'EUR',
+        b2c: {
+          priceNet: pricing.b2c.priceNet,
+          vatRate: pricing.b2c.vatRate,
+          priceGross: pricing.b2c.priceGross,
+        },
+        b2b: {
+          priceNet: pricing.b2b.priceNet,
+          vatRate: pricing.b2b.vatRate,
+          priceGross: pricing.b2b.priceGross,
+        },
+      },
     });
 
     return res.status(201).json({
@@ -121,6 +145,52 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error('Add product error:', err);
     return res.status(500).json({ message: 'Failed to add product' });
+  }
+};
+
+export const updateProductPricing = async (req: AuthRequest, res: Response) => {
+  try {
+    const productId = Number(req.params.id);
+    const { pricing } = req.body;
+
+    if (!Number.isInteger(productId) || productId <= 0) {
+      return res.status(400).json({ message: 'Valid product id is required' });
+    }
+
+    if (
+      !pricing?.b2c ||
+      !pricing?.b2b ||
+      !isValidMoney(pricing.b2c.priceNet) ||
+      !isValidMoney(pricing.b2c.priceGross) ||
+      !isValidMoney(pricing.b2b.priceNet) ||
+      !isValidMoney(pricing.b2b.priceGross) ||
+      !isValidMoney(pricing.b2c.vatRate) ||
+      !isValidMoney(pricing.b2b.vatRate)
+    ) {
+      return res.status(400).json({ message: 'Valid B2C and B2B pricing is required' });
+    }
+
+    await updateProductPrices({
+      productId,
+      currency: pricing.currency || 'EUR',
+      b2c: {
+        priceNet: pricing.b2c.priceNet,
+        vatRate: pricing.b2c.vatRate,
+        priceGross: pricing.b2c.priceGross,
+      },
+      b2b: {
+        priceNet: pricing.b2b.priceNet,
+        vatRate: pricing.b2b.vatRate,
+        priceGross: pricing.b2b.priceGross,
+      },
+    });
+
+    return res.status(200).json({
+      message: 'Product pricing updated successfully',
+    });
+  } catch (err) {
+    console.error('Update product pricing error:', err);
+    return res.status(500).json({ message: 'Failed to update product pricing' });
   }
 };
 

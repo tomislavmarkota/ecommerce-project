@@ -1,0 +1,164 @@
+.page {
+  display: grid;
+  gap: 24px;
+}
+
+.header {
+  h2 {
+    margin: 0 0 8px;
+    color: var(--phoenix-heading, #141824);
+  }
+}
+
+.message {
+  margin: 0;
+  color: var(--phoenix-text-muted, #6e7891);
+}
+
+.form {
+  display: grid;
+  gap: 24px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--phoenix-text, #31374a);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px 14px;
+  border: 1px solid #d7dce5;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--phoenix-text, #31374a);
+  font-size: 0.95rem;
+  outline: none;
+  resize: vertical;
+
+  &:focus {
+    border-color: rgba(56, 116, 255, 0.55);
+    box-shadow: 0 0 0 3px rgba(56, 116, 255, 0.12);
+  }
+}
+
+.imageSection {
+  display: grid;
+  gap: 16px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  h3 {
+    margin: 0;
+  }
+}
+
+.imageGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.imageRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.pricingGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.pricingCard {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--phoenix-border, #e6e9ef);
+  border-radius: 16px;
+  background: #fff;
+
+  h3 {
+    margin: 0 0 4px;
+    color: var(--phoenix-heading, #141824);
+  }
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  color: var(--phoenix-text, #31374a);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.primaryButton,
+.secondaryButton,
+.removeButton {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.primaryButton {
+  background: var(--phoenix-primary, #3874ff);
+  color: #fff;
+}
+
+.secondaryButton {
+  background: #fff;
+  color: var(--phoenix-text, #31374a);
+  border-color: var(--phoenix-border, #e6e9ef);
+}
+
+.removeButton {
+  background: #fff;
+  color: #dc3545;
+  border-color: #f1b0b7;
+}
+
+@media (max-width: 768px) {
+  .grid,
+  .pricingGrid,
+  .imageRow {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    flex-direction: column-reverse;
+  }
+}
