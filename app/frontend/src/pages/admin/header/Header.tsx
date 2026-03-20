@@ -1,5 +1,5 @@
 import { use, useEffect, useRef, useState } from 'react';
-import { ThemeContext } from '../../../context/themeProvider.context';
+import { ThemeContext } from '../../../context/theme/theme.context';
 import ThemeSwitcher from '../../../components/themeSwitcher/ThemeSwitcher';
 import headerStyles from './header.module.scss';
 import NotificatonIcon from '../../../assets/notification.svg?react';

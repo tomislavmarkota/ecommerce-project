@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { ThemeProvider } from './context/themeProvider.context';
+import { ThemeProvider } from './context/theme/themeProvider';
 import { BrowserRouter, Route, Routes } from 'react-router';
 import { UserProvider } from './context/userProvider.context';
 import { CartProvider } from './context/cartProvider.context';
