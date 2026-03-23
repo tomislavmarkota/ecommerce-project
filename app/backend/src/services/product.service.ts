@@ -1,5 +1,6 @@
 import { pool } from '../config/db';
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { PRICE_LIST_CODES } from '../constants/pricing';
 
 type GetProductsListParams = {
   page: number;
@@ -18,8 +19,8 @@ type ProductListRow = RowDataPacket & {
   category_name: string | null;
   subcategory_name: string | null;
   thumbnail: string | null;
-  b2c_price_gross: string | null;
-  b2b_price_gross: string | null;
+  retail_price_gross: string | null;
+  business_price_gross: string | null;
 };
 
 type CountRow = RowDataPacket & {
@@ -35,13 +36,14 @@ type CreateProductParams = {
   images: string[];
   isPublished: boolean;
   pricing: {
-    currency?: string;
-    b2c: {
+    retail: {
+      priceListId: number;
       priceNet: number;
       vatRate: number;
       priceGross: number;
     };
-    b2b: {
+    business: {
+      priceListId: number;
       priceNet: number;
       vatRate: number;
       priceGross: number;
@@ -49,18 +51,31 @@ type CreateProductParams = {
   };
 };
 
-type UpdateProductPricesParams = {
-  productId: number;
-  currency?: string;
-  b2c: {
-    priceNet: number;
-    vatRate: number;
-    priceGross: number;
-  };
-  b2b: {
-    priceNet: number;
-    vatRate: number;
-    priceGross: number;
+type PriceListRow = RowDataPacket & {
+  id: number;
+  code: string;
+};
+
+export const getAdminPriceListIds = async () => {
+  const [rows] = await pool.query<PriceListRow[]>(
+    `
+      SELECT id, code
+      FROM price_lists
+      WHERE code IN (?, ?)
+    `,
+    [PRICE_LIST_CODES.RETAIL_EUR, PRICE_LIST_CODES.BUSINESS_EUR],
+  );
+
+  const retail = rows.find((row) => row.code === PRICE_LIST_CODES.RETAIL_EUR);
+  const business = rows.find((row) => row.code === PRICE_LIST_CODES.BUSINESS_EUR);
+
+  if (!retail || !business) {
+    throw new Error('Required price lists are not configured');
+  }
+
+  return {
+    retailPriceListId: retail.id,
+    businessPriceListId: business.id,
   };
 };
 
@@ -101,21 +116,19 @@ export const getProductsList = async ({ page, limit, search, sortBy, sortOrder }
         LIMIT 1
       ) AS thumbnail,
       (
-        SELECT pp.price_gross
-        FROM product_prices pp
-        WHERE pp.product_id = p.id
-          AND pp.customer_type = 'b2c'
-          AND pp.currency = 'EUR'
+        SELECT plp.price_gross
+        FROM price_list_prices plp
+        WHERE plp.product_id = p.id
+          AND plp.price_list_id = 1
         LIMIT 1
-      ) AS b2c_price_gross,
+      ) AS retail_price_gross,
       (
-        SELECT pp.price_gross
-        FROM product_prices pp
-        WHERE pp.product_id = p.id
-          AND pp.customer_type = 'b2b'
-          AND pp.currency = 'EUR'
+        SELECT plp.price_gross
+        FROM price_list_prices plp
+        WHERE plp.product_id = p.id
+          AND plp.price_list_id = 2
         LIMIT 1
-      ) AS b2b_price_gross
+      ) AS business_price_gross
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
     LEFT JOIN subcategories sc ON sc.id = p.subcategory_id
@@ -142,8 +155,8 @@ export const getProductsList = async ({ page, limit, search, sortBy, sortOrder }
     data: rows.map((row) => ({
       ...row,
       is_published: Boolean(row.is_published),
-      b2c_price_gross: row.b2c_price_gross != null ? Number(row.b2c_price_gross) : null,
-      b2b_price_gross: row.b2b_price_gross != null ? Number(row.b2b_price_gross) : null,
+      retail_price_gross: row.retail_price_gross != null ? Number(row.retail_price_gross) : null,
+      business_price_gross: row.business_price_gross != null ? Number(row.business_price_gross) : null,
     })),
     total,
     page,
@@ -177,8 +190,6 @@ export const createProduct = async ({
   pricing,
 }: CreateProductParams) => {
   const connection = await pool.getConnection();
-  const currency = pricing.currency || 'EUR';
-
   try {
     await connection.beginTransaction();
 
@@ -201,6 +212,28 @@ export const createProduct = async ({
 
     const productId = result.insertId;
 
+    await connection.query(
+      `
+        INSERT INTO price_list_prices
+          (price_list_id, product_id, price_net, vat_rate, price_gross)
+        VALUES
+          (?, ?, ?, ?, ?),
+          (?, ?, ?, ?, ?)
+      `,
+      [
+        pricing.retail.priceListId,
+        productId,
+        pricing.retail.priceNet,
+        pricing.retail.vatRate,
+        pricing.retail.priceGross,
+        pricing.business.priceListId,
+        productId,
+        pricing.business.priceNet,
+        pricing.business.vatRate,
+        pricing.business.priceGross,
+      ],
+    );
+
     if (images.length > 0) {
       const values = images.map((url, index) => [productId, url, index]);
 
@@ -214,28 +247,6 @@ export const createProduct = async ({
       );
     }
 
-    await connection.query(
-      `
-        INSERT INTO product_prices
-          (product_id, customer_type, currency, price_net, vat_rate, price_gross)
-        VALUES
-          (?, 'b2c', ?, ?, ?, ?),
-          (?, 'b2b', ?, ?, ?, ?)
-      `,
-      [
-        productId,
-        currency,
-        pricing.b2c.priceNet,
-        pricing.b2c.vatRate,
-        pricing.b2c.priceGross,
-        productId,
-        currency,
-        pricing.b2b.priceNet,
-        pricing.b2b.vatRate,
-        pricing.b2b.priceGross,
-      ],
-    );
-
     await connection.commit();
 
     return { productId };
@@ -247,7 +258,25 @@ export const createProduct = async ({
   }
 };
 
-export const updateProductPrices = async ({ productId, currency = 'EUR', b2c, b2b }: UpdateProductPricesParams) => {
+export const updateProductPrices = async ({
+  productId,
+  retail,
+  business,
+}: {
+  productId: number;
+  retail: {
+    priceListId: number;
+    priceNet: number;
+    vatRate: number;
+    priceGross: number;
+  };
+  business: {
+    priceListId: number;
+    priceNet: number;
+    vatRate: number;
+    priceGross: number;
+  };
+}) => {
   const connection = await pool.getConnection();
 
   try {
@@ -255,11 +284,11 @@ export const updateProductPrices = async ({ productId, currency = 'EUR', b2c, b2
 
     await connection.query(
       `
-        INSERT INTO product_prices
-          (product_id, customer_type, currency, price_net, vat_rate, price_gross)
+        INSERT INTO price_list_prices
+          (price_list_id, product_id, price_net, vat_rate, price_gross)
         VALUES
-          (?, 'b2c', ?, ?, ?, ?),
-          (?, 'b2b', ?, ?, ?, ?)
+          (?, ?, ?, ?, ?),
+          (?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           price_net = VALUES(price_net),
           vat_rate = VALUES(vat_rate),
@@ -267,16 +296,16 @@ export const updateProductPrices = async ({ productId, currency = 'EUR', b2c, b2
           updated_at = CURRENT_TIMESTAMP
       `,
       [
+        retail.priceListId,
         productId,
-        currency,
-        b2c.priceNet,
-        b2c.vatRate,
-        b2c.priceGross,
+        retail.priceNet,
+        retail.vatRate,
+        retail.priceGross,
+        business.priceListId,
         productId,
-        currency,
-        b2b.priceNet,
-        b2b.vatRate,
-        b2b.priceGross,
+        business.priceNet,
+        business.vatRate,
+        business.priceGross,
       ],
     );
 
@@ -299,7 +328,7 @@ export const deleteProductsByIds = async (ids: number[]) => {
     await connection.beginTransaction();
 
     await connection.query(`DELETE FROM product_images WHERE product_id IN (${placeholders})`, ids);
-    await connection.query(`DELETE FROM product_prices WHERE product_id IN (${placeholders})`, ids);
+    await connection.query(`DELETE FROM price_list_prices WHERE product_id IN (${placeholders})`, ids);
 
     const [result] = await connection.query<ResultSetHeader>(`DELETE FROM products WHERE id IN (${placeholders})`, ids);
 
@@ -308,6 +337,229 @@ export const deleteProductsByIds = async (ids: number[]) => {
     return {
       deletedCount: result.affectedRows,
     };
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+};
+
+type ProductDetailsRow = RowDataPacket & {
+  id: number;
+  name: string;
+  description: string | null;
+  stock: number;
+  is_published: number;
+  category_id: number | null;
+  subcategory_id: number | null;
+  created_at: string;
+};
+
+type ProductPriceRow = RowDataPacket & {
+  code: string;
+  price_net: string;
+  vat_rate: string;
+  price_gross: string;
+};
+
+type ProductImageRow = RowDataPacket & {
+  id: number;
+  image_url: string;
+  sort_order: number;
+};
+
+export const getProductById = async (productId: number) => {
+  const [productRows] = await pool.query<ProductDetailsRow[]>(
+    `
+      SELECT
+        p.id,
+        p.name,
+        p.description,
+        p.stock,
+        p.is_published,
+        p.category_id,
+        p.subcategory_id,
+        p.created_at
+      FROM products p
+      WHERE p.id = ?
+      LIMIT 1
+    `,
+    [productId],
+  );
+
+  const product = productRows[0];
+
+  if (!product) {
+    return null;
+  }
+
+  const [priceRows] = await pool.query<ProductPriceRow[]>(
+    `
+      SELECT
+        pl.code,
+        plp.price_net,
+        plp.vat_rate,
+        plp.price_gross
+      FROM price_list_prices plp
+      JOIN price_lists pl ON pl.id = plp.price_list_id
+      WHERE plp.product_id = ?
+    `,
+    [productId],
+  );
+
+  const [imageRows] = await pool.query<ProductImageRow[]>(
+    `
+      SELECT
+        id,
+        image_url,
+        sort_order
+      FROM product_images
+      WHERE product_id = ?
+      ORDER BY sort_order ASC, id ASC
+    `,
+    [productId],
+  );
+
+  const retail = priceRows.find((row) => row.code === 'retail-eur');
+  const business = priceRows.find((row) => row.code === 'business-eur');
+
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    stock: product.stock,
+    categoryId: product.category_id,
+    subcategoryId: product.subcategory_id,
+    isPublished: Boolean(product.is_published),
+    createdAt: product.created_at,
+    images: imageRows.map((row) => row.image_url),
+    pricing: {
+      retail: retail
+        ? {
+            priceNet: Number(retail.price_net),
+            vatRate: Number(retail.vat_rate),
+            priceGross: Number(retail.price_gross),
+          }
+        : null,
+      business: business
+        ? {
+            priceNet: Number(business.price_net),
+            vatRate: Number(business.vat_rate),
+            priceGross: Number(business.price_gross),
+          }
+        : null,
+    },
+  };
+};
+
+type UpdateProductParams = {
+  productId: number;
+  name: string;
+  description: string;
+  stock: number;
+  categoryId: number;
+  subcategoryId: number | null;
+  images: string[];
+  isPublished: boolean;
+  pricing: {
+    retail: {
+      priceNet: number;
+      vatRate: number;
+      priceGross: number;
+    };
+    business: {
+      priceNet: number;
+      vatRate: number;
+      priceGross: number;
+    };
+  };
+};
+
+export const updateProductById = async ({
+  productId,
+  name,
+  description,
+  stock,
+  categoryId,
+  subcategoryId,
+  images,
+  isPublished,
+  pricing,
+}: UpdateProductParams) => {
+  const connection = await pool.getConnection();
+
+  try {
+    const { retailPriceListId, businessPriceListId } = await getAdminPriceListIds();
+
+    await connection.beginTransaction();
+
+    await connection.query(
+      `
+        UPDATE products
+        SET
+          name = ?,
+          description = ?,
+          stock = ?,
+          category_id = ?,
+          subcategory_id = ?,
+          is_published = ?
+        WHERE id = ?
+      `,
+      [name, description, stock, categoryId, subcategoryId, isPublished, productId],
+    );
+
+    await connection.query(
+      `
+        DELETE FROM product_images
+        WHERE product_id = ?
+      `,
+      [productId],
+    );
+
+    if (images.length > 0) {
+      const values = images.map((url, index) => [productId, url, index]);
+
+      await connection.query(
+        `
+          INSERT INTO product_images
+            (product_id, image_url, sort_order)
+          VALUES ?
+        `,
+        [values],
+      );
+    }
+
+    await connection.query(
+      `
+        INSERT INTO price_list_prices
+          (price_list_id, product_id, price_net, vat_rate, price_gross)
+        VALUES
+          (?, ?, ?, ?, ?),
+          (?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          price_net = VALUES(price_net),
+          vat_rate = VALUES(vat_rate),
+          price_gross = VALUES(price_gross),
+          updated_at = CURRENT_TIMESTAMP
+      `,
+      [
+        retailPriceListId,
+        productId,
+        pricing.retail.priceNet,
+        pricing.retail.vatRate,
+        pricing.retail.priceGross,
+        businessPriceListId,
+        productId,
+        pricing.business.priceNet,
+        pricing.business.vatRate,
+        pricing.business.priceGross,
+      ],
+    );
+
+    await connection.commit();
+
+    return { updated: true };
   } catch (err) {
     await connection.rollback();
     throw err;

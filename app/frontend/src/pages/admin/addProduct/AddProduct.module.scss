@@ -150,6 +150,15 @@
   color: #dc3545;
   border-color: #f1b0b7;
 }
+.select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d9dde7;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: #fff;
+  font-size: 14px;
+}
 
 @media (max-width: 768px) {
   .grid,

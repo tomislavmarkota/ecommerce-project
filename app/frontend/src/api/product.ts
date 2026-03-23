@@ -1,8 +1,5 @@
 import api from './axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const url = `${API_BASE}/api/products`;
-
 export type ProductRow = {
   id: number;
   name: string;
@@ -12,8 +9,8 @@ export type ProductRow = {
   category_name: string | null;
   subcategory_name: string | null;
   thumbnail: string | null;
-  b2c_price_gross: number | null;
-  b2b_price_gross: number | null;
+  retail_price_gross: number | null;
+  business_price_gross: number | null;
 };
 
 export type ProductsResponse = {
@@ -34,6 +31,30 @@ export type FetchProductsParams = {
   }[];
 };
 
+export type ProductDetailsResponse = {
+  id: number;
+  name: string;
+  description: string | null;
+  stock: number;
+  categoryId: number | null;
+  subcategoryId: number | null;
+  isPublished: boolean;
+  createdAt: string;
+  images: string[];
+  pricing: {
+    retail: {
+      priceNet: number;
+      vatRate: number;
+      priceGross: number;
+    } | null;
+    business: {
+      priceNet: number;
+      vatRate: number;
+      priceGross: number;
+    } | null;
+  };
+};
+
 export type CreateProductPayload = {
   name: string;
   description: string;
@@ -43,13 +64,12 @@ export type CreateProductPayload = {
   images: string[];
   isPublished: boolean;
   pricing: {
-    currency: string;
-    b2c: {
+    retail: {
       priceNet: number;
       vatRate: number;
       priceGross: number;
     };
-    b2b: {
+    business: {
       priceNet: number;
       vatRate: number;
       priceGross: number;
@@ -57,15 +77,16 @@ export type CreateProductPayload = {
   };
 };
 
+export type UpdateProductPayload = CreateProductPayload;
+
 export type UpdateProductPricingPayload = {
   pricing: {
-    currency: string;
-    b2c: {
+    retail: {
       priceNet: number;
       vatRate: number;
       priceGross: number;
     };
-    b2b: {
+    business: {
       priceNet: number;
       vatRate: number;
       priceGross: number;
@@ -94,17 +115,22 @@ export const fetchProducts = async ({
 };
 
 export const createProduct = async (payload: CreateProductPayload) => {
-  const res = await api.post(`${url}/add`, payload);
+  const res = await api.post('/products/add', payload);
+  return res.data;
+};
+
+export const updateProduct = async (productId: number, payload: UpdateProductPayload) => {
+  const res = await api.put(`/products/${productId}`, payload);
   return res.data;
 };
 
 export const updateProductPricing = async (productId: number, payload: UpdateProductPricingPayload) => {
-  const res = await api.patch(`${url}/products/${productId}/pricing`, payload);
+  const res = await api.patch(`/products/${productId}/pricing`, payload);
   return res.data;
 };
 
 export const deleteProducts = async (ids: number[]) => {
-  const res = await api.delete(`${url}/products/bulk`, {
+  const res = await api.delete('/products/bulk', {
     data: { ids },
   });
 
@@ -113,4 +139,9 @@ export const deleteProducts = async (ids: number[]) => {
     deletedCount: number;
     ids: number[];
   };
+};
+
+export const fetchProductById = async (productId: number) => {
+  const res = await api.get(`/products/${productId}`);
+  return res.data as ProductDetailsResponse;
 };

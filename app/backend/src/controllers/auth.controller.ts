@@ -2,8 +2,6 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { pool } from '../config/db';
-import dotenv from 'dotenv';
-dotenv.config();
 
 export const signup = async (req: Request, res: Response) => {
   const { email, password } = req.body;
@@ -22,13 +20,6 @@ export const signup = async (req: Request, res: Response) => {
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err });
   }
-};
-
-type User = {
-  id: number;
-  email: string;
-  password: string;
-  role: string;
 };
 
 export const signin = async (req: Request, res: Response) => {

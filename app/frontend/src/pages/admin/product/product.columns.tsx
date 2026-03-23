@@ -48,13 +48,13 @@ export const productColumns: ColumnDef<ProductRow>[] = [
     },
   },
   {
-    accessorKey: 'b2c_price_gross',
-    header: 'B2C price',
+    accessorKey: 'retail_price_gross',
+    header: 'Retail price',
     cell: ({ getValue }) => formatCurrency(getValue() as number | null),
   },
   {
-    accessorKey: 'b2b_price_gross',
-    header: 'B2B price',
+    accessorKey: 'business_price_gross',
+    header: 'Business price',
     cell: ({ getValue }) => formatCurrency(getValue() as number | null),
   },
   {

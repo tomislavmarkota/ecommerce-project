@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/admin.middleware';
-import { buildCheckoutPreview } from '../services/checkout.service';
+import { buildCheckoutPreview } from '../services/checkoutService/checkout.service';
 
 export const getCheckoutPreview = async (req: AuthRequest, res: Response) => {
   try {

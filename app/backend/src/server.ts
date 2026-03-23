@@ -1,6 +1,20 @@
+import './config/env';
 import app from './app';
-const port = process.env.PORT || 8000;
+import { ensureBlobContainer } from './services/azureBlob.service';
+import { testDbConnection } from './config/db';
 
-app.listen(port, () => {
-  console.log(`🚀 Server running on http://localhost:${port}`);
+const PORT = Number(process.env.PORT || 8000);
+
+async function start(): Promise<void> {
+  await testDbConnection();
+  await ensureBlobContainer();
+
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+start().catch((error) => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
 });

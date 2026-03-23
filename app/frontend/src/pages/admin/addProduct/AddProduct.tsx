@@ -13,13 +13,12 @@ type ProductFormState = {
   isPublished: boolean;
   images: string[];
   pricing: {
-    currency: string;
-    b2c: {
+    retail: {
       priceNet: number;
       vatRate: number;
       priceGross: number;
     };
-    b2b: {
+    business: {
       priceNet: number;
       vatRate: number;
       priceGross: number;
@@ -36,13 +35,12 @@ const initialForm: ProductFormState = {
   isPublished: false,
   images: [''],
   pricing: {
-    currency: 'EUR',
-    b2c: {
+    retail: {
       priceNet: 0,
       vatRate: 25,
       priceGross: 0,
     },
-    b2b: {
+    business: {
       priceNet: 0,
       vatRate: 25,
       priceGross: 0,
@@ -71,13 +69,13 @@ const AdminAddProduct = () => {
   };
 
   const handlePricingChange = (
-    customerType: 'b2c' | 'b2b',
+    pricingType: 'retail' | 'business',
     field: 'priceNet' | 'priceGross' | 'vatRate',
     value: number,
   ) => {
     setForm((prev) => {
       const nextPricing = {
-        ...prev.pricing[customerType],
+        ...prev.pricing[pricingType],
         [field]: value,
       };
 
@@ -93,7 +91,7 @@ const AdminAddProduct = () => {
         ...prev,
         pricing: {
           ...prev.pricing,
-          [customerType]: nextPricing,
+          [pricingType]: nextPricing,
         },
       };
     });
@@ -192,16 +190,15 @@ const AdminAddProduct = () => {
         images: form.images.filter((url) => url.trim() !== ''),
         isPublished: form.isPublished,
         pricing: {
-          currency: form.pricing.currency,
-          b2c: {
-            priceNet: Number(form.pricing.b2c.priceNet),
-            vatRate: Number(form.pricing.b2c.vatRate),
-            priceGross: Number(form.pricing.b2c.priceGross),
+          retail: {
+            priceNet: Number(form.pricing.retail.priceNet),
+            vatRate: Number(form.pricing.retail.vatRate),
+            priceGross: Number(form.pricing.retail.priceGross),
           },
-          b2b: {
-            priceNet: Number(form.pricing.b2b.priceNet),
-            vatRate: Number(form.pricing.b2b.vatRate),
-            priceGross: Number(form.pricing.b2b.priceGross),
+          business: {
+            priceNet: Number(form.pricing.business.priceNet),
+            vatRate: Number(form.pricing.business.vatRate),
+            priceGross: Number(form.pricing.business.priceGross),
           },
         },
       };
@@ -211,7 +208,6 @@ const AdminAddProduct = () => {
       setMessage(`✅ Product added with ID: ${res.productId}`);
       setForm(initialForm);
 
-      // optional
       // navigate('/product');
     } catch (err: any) {
       setMessage(err?.response?.data?.message || '❌ Failed to add product');
@@ -285,14 +281,14 @@ const AdminAddProduct = () => {
 
         <div className={styles.pricingGrid}>
           <div className={styles.pricingCard}>
-            <h3>B2C Pricing</h3>
+            <h3>Retail Pricing</h3>
 
             <Input
               inputProps={{
                 type: 'number',
                 step: '0.01',
-                value: form.pricing.b2c.priceNet,
-                onChange: (e) => handlePricingChange('b2c', 'priceNet', Number(e.target.value)),
+                value: form.pricing.retail.priceNet,
+                onChange: (e) => handlePricingChange('retail', 'priceNet', Number(e.target.value)),
               }}
               label={{ text: 'Net price' }}
             />
@@ -301,8 +297,8 @@ const AdminAddProduct = () => {
               inputProps={{
                 type: 'number',
                 step: '0.01',
-                value: form.pricing.b2c.vatRate,
-                onChange: (e) => handlePricingChange('b2c', 'vatRate', Number(e.target.value)),
+                value: form.pricing.retail.vatRate,
+                onChange: (e) => handlePricingChange('retail', 'vatRate', Number(e.target.value)),
               }}
               label={{ text: 'VAT rate (%)' }}
             />
@@ -311,22 +307,22 @@ const AdminAddProduct = () => {
               inputProps={{
                 type: 'number',
                 step: '0.01',
-                value: form.pricing.b2c.priceGross,
-                onChange: (e) => handlePricingChange('b2c', 'priceGross', Number(e.target.value)),
+                value: form.pricing.retail.priceGross,
+                onChange: (e) => handlePricingChange('retail', 'priceGross', Number(e.target.value)),
               }}
               label={{ text: 'Gross price' }}
             />
           </div>
 
           <div className={styles.pricingCard}>
-            <h3>B2B Pricing</h3>
+            <h3>Business Pricing</h3>
 
             <Input
               inputProps={{
                 type: 'number',
                 step: '0.01',
-                value: form.pricing.b2b.priceNet,
-                onChange: (e) => handlePricingChange('b2b', 'priceNet', Number(e.target.value)),
+                value: form.pricing.business.priceNet,
+                onChange: (e) => handlePricingChange('business', 'priceNet', Number(e.target.value)),
               }}
               label={{ text: 'Net price' }}
             />
@@ -335,8 +331,8 @@ const AdminAddProduct = () => {
               inputProps={{
                 type: 'number',
                 step: '0.01',
-                value: form.pricing.b2b.vatRate,
-                onChange: (e) => handlePricingChange('b2b', 'vatRate', Number(e.target.value)),
+                value: form.pricing.business.vatRate,
+                onChange: (e) => handlePricingChange('business', 'vatRate', Number(e.target.value)),
               }}
               label={{ text: 'VAT rate (%)' }}
             />
@@ -345,8 +341,8 @@ const AdminAddProduct = () => {
               inputProps={{
                 type: 'number',
                 step: '0.01',
-                value: form.pricing.b2b.priceGross,
-                onChange: (e) => handlePricingChange('b2b', 'priceGross', Number(e.target.value)),
+                value: form.pricing.business.priceGross,
+                onChange: (e) => handlePricingChange('business', 'priceGross', Number(e.target.value)),
               }}
               label={{ text: 'Gross price' }}
             />

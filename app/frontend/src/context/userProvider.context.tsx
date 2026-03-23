@@ -1,8 +1,6 @@
-// UserContext.tsx
 import axios from 'axios';
-import { createContext, useState, useEffect } from 'react';
-import api from '../api/axios';
-import { refreshSession } from '../utils/refreshManager';
+import { createContext, useEffect, useState } from 'react';
+import { setAccessToken as setStoredAccessToken, clearAccessToken } from '../utils/tokenManager';
 
 interface User {
   email: string;
@@ -31,57 +29,58 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [accessToken, setAccessTokenState] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Automatically attach the in-memory access token to all requests
-  useEffect(() => {
-    const requestInterceptor = api.interceptors.request.use(
-      (config) => {
-        if (accessToken) {
-          config.headers['Authorization'] = `Bearer ${accessToken}`;
-          setLoading(false);
-        }
-        return config;
-      },
-      (error) => Promise.reject(error),
-    );
-
-    return () => {
-      api.interceptors.request.eject(requestInterceptor);
-    };
-  }, [accessToken]);
+  const setAccessToken = (token: string | null) => {
+    setAccessTokenState(token);
+    setStoredAccessToken(token);
+  };
 
   useEffect(() => {
-    if (!user) {
-      const restoreSession = async () => {
-        const data = await refreshSession().catch(() => null);
+    const restoreSession = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/auth/refresh`, {
+          withCredentials: true,
+        });
 
-        if (data?.user) {
-          setUser(data.user);
-          setAccessToken(data.accessToken);
-        }
+        const newToken = res.data?.accessToken ?? null;
+        const userData = res.data?.user ?? null;
 
+        setAccessToken(newToken);
+        setUser(userData);
+      } catch {
+        setAccessToken(null);
+        setUser(null);
+      } finally {
         setLoading(false);
-      };
+      }
+    };
 
-      restoreSession();
-    }
-  }, [user]);
+    restoreSession();
+  }, []);
 
-  console.log('user', user);
-  console.log('accessToken', accessToken);
   const logout = async () => {
     try {
       await axios.post(`${API_URL}/api/auth/logout`, {}, { withCredentials: true });
     } finally {
+      clearAccessToken();
+      setAccessTokenState(null);
       setUser(null);
-      setAccessToken(null);
     }
   };
 
   return (
-    <UserContext.Provider value={{ user, setUser, logout, accessToken, setAccessToken, loading }}>
+    <UserContext.Provider
+      value={{
+        user,
+        setUser,
+        accessToken,
+        setAccessToken,
+        logout,
+        loading,
+      }}
+    >
       {children}
     </UserContext.Provider>
   );

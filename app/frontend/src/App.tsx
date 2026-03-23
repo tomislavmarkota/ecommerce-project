@@ -24,7 +24,7 @@ const Help = lazy(() => import('./pages/admin/help/Help'));
 const AdminAddProduct = lazy(() => import('./pages/admin/addProduct/AddProduct'));
 const UserDetailsPage = lazy(() => import('./pages/admin/userDetails/UserDetails'));
 const OrdersPage = lazy(() => import('./pages/admin/orders/Orders'));
-
+const ProductDetailsPage = lazy(() => import('./pages/admin/productDetails/ProductDetailsPage'));
 function App() {
   return (
     <UserProvider>
@@ -46,10 +46,17 @@ function App() {
                 <Route element={<ProtectedRoute />}>
                   <Route element={<AppContainer />}>
                     <Route path="/dashboard" element={<Dashboard />} />
+                    {/*                     
                     <Route path="/product">
                       <Route index element={<Product />} />
                       <Route path="add-product" element={<AdminAddProduct />} />
+                    </Route> */}
+                    <Route path="/product">
+                      <Route index element={<Product />} />
+                      <Route path="add-product" element={<AdminAddProduct />} />
+                      <Route path=":id" element={<ProductDetailsPage />} />
                     </Route>
+
                     <Route path="/transaction" element={<Transaction />} />
                     <Route path="/orders" element={<OrdersPage />} />
                     <Route path="/users" element={<Customers />} />

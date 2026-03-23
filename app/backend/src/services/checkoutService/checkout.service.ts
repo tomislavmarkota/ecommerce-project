@@ -1,5 +1,5 @@
-import { getCustomerTypeForUser, resolveProductPrice } from './product-pricing.service';
-import { calculateCouponDiscount, validateCouponForCheckout } from './coupon.service';
+import { getPriceListContextForUser, resolveProductPrice } from '../product-pricing.service';
+import { calculateCouponDiscount, validateCouponForCheckout } from '../couponService/coupon.service';
 
 export const buildCheckoutPreview = async ({
   items,
@@ -10,12 +10,12 @@ export const buildCheckoutPreview = async ({
   userId?: number | null;
   couponCode?: string;
 }) => {
-  const customerType = await getCustomerTypeForUser(userId ?? null);
+  const pricingContext = await getPriceListContextForUser(userId ?? null);
 
   const resolvedItems = [];
 
   for (const item of items) {
-    const resolvedPrice = await resolveProductPrice(item.productId, customerType);
+    const resolvedPrice = await resolveProductPrice(item.productId, userId ?? null);
 
     if (!resolvedPrice) {
       throw new Error(`Pricing not found for product ${item.productId}`);
@@ -38,7 +38,7 @@ export const buildCheckoutPreview = async ({
   const coupon = couponCode
     ? await validateCouponForCheckout({
         code: couponCode,
-        customerType,
+        customerGroupId: pricingContext.customerGroupId,
         subtotal,
         userId: userId ?? null,
       })
@@ -48,7 +48,7 @@ export const buildCheckoutPreview = async ({
   const grandTotal = Math.max(0, subtotal - couponDiscount);
 
   return {
-    customerType,
+    customerGroupCode: pricingContext.customerGroupCode,
     items: resolvedItems,
     subtotal,
     coupon: coupon

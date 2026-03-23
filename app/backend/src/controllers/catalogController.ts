@@ -3,7 +3,7 @@ import { AuthRequest } from '../middleware/admin.middleware';
 import {
   getCatalogProductWithPricing,
   getCatalogProductsList,
-  getCustomerTypeForUser,
+  getPriceListContextForUser,
 } from '../services/product-pricing.service';
 
 export const getCatalogProducts = async (req: Request | AuthRequest, res: Response) => {
@@ -14,13 +14,13 @@ export const getCatalogProducts = async (req: Request | AuthRequest, res: Respon
     const search = rawSearch || '';
 
     const authReq = req as AuthRequest;
-    const customerType = await getCustomerTypeForUser(authReq.user?.id ?? null);
+    const pricingContext = await getPriceListContextForUser(authReq.user?.id ?? null);
 
     const result = await getCatalogProductsList({
       page,
       limit,
       search,
-      customerType,
+      pricingContext,
     });
 
     return res.status(200).json(result);
@@ -39,9 +39,7 @@ export const getCatalogProduct = async (req: Request | AuthRequest, res: Respons
     }
 
     const authReq = req as AuthRequest;
-    const customerType = await getCustomerTypeForUser(authReq.user?.id ?? null);
-
-    const product = await getCatalogProductWithPricing(productId, customerType);
+    const product = await getCatalogProductWithPricing(productId, authReq.user?.id ?? null);
 
     if (!product || !product.isPublished) {
       return res.status(404).json({ message: 'Product not found' });

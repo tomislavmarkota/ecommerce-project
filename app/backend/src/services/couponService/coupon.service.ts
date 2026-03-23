@@ -1,6 +1,5 @@
-import { pool } from '../config/db';
+import { pool } from '../../config/db';
 import { RowDataPacket } from 'mysql2/promise';
-import { CustomerType } from './product-pricing.service';
 
 type CouponRow = RowDataPacket & {
   id: number;
@@ -10,7 +9,6 @@ type CouponRow = RowDataPacket & {
   min_order_total: string;
   usage_limit: number | null;
   per_customer_limit: number | null;
-  customer_type: 'all' | CustomerType;
 };
 
 type CountRow = RowDataPacket & {
@@ -19,27 +17,31 @@ type CountRow = RowDataPacket & {
 
 export const validateCouponForCheckout = async ({
   code,
-  customerType,
+  customerGroupId,
   subtotal,
   userId,
 }: {
   code: string;
-  customerType: CustomerType;
+  customerGroupId?: number | null;
   subtotal: number;
   userId?: number | null;
 }) => {
   const [rows] = await pool.query<CouponRow[]>(
     `
-      SELECT *
-      FROM coupons
-      WHERE code = ?
-        AND active = 1
-        AND (valid_from IS NULL OR valid_from <= NOW())
-        AND (valid_to IS NULL OR valid_to >= NOW())
-        AND (customer_type = 'all' OR customer_type = ?)
+      SELECT c.*
+      FROM coupons c
+      LEFT JOIN coupon_customer_groups ccg ON ccg.coupon_id = c.id
+      WHERE c.code = ?
+        AND c.active = 1
+        AND (c.valid_from IS NULL OR c.valid_from <= NOW())
+        AND (c.valid_to IS NULL OR c.valid_to >= NOW())
+        AND (
+          ccg.customer_group_id IS NULL
+          OR ccg.customer_group_id = ?
+        )
       LIMIT 1
     `,
-    [code, customerType],
+    [code, customerGroupId ?? null],
   );
 
   const coupon = rows[0];

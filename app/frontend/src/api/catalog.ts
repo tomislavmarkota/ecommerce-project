@@ -13,7 +13,8 @@ export type PublicCatalogProduct = {
   thumbnail: string | null;
   pricing: {
     productId: number;
-    customerType: 'b2c' | 'b2b';
+    customerGroupCode: string;
+    priceListId: number;
     currency: string;
     originalNet: number;
     originalGross: number;
@@ -38,7 +39,9 @@ export type CatalogProductsResponse = {
   limit: number;
   totalPages: number;
 };
+
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 export const fetchCatalogProducts = async ({
   page = 1,
   limit = 12,

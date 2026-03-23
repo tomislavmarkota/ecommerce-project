@@ -40,7 +40,9 @@ export const createCategory = async (req: Request, res: Response): Promise<Respo
  */
 export const getCategories = async (_req: Request, res: Response): Promise<Response> => {
   try {
-    const [rows] = await pool.execute<RowDataPacket[]>('SELECT id, name FROM categories ORDER BY name ASC');
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT id, name, slug FROM categories WHERE is_active = 1 ORDER BY name ASC',
+    );
 
     return res.status(200).json(rows);
   } catch (err) {
@@ -145,6 +147,30 @@ export const deleteCategory = async (req: Request, res: Response): Promise<Respo
     }
 
     return res.status(200).json({ message: 'Category deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+export const getSubcategories = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const categoryId = Number(req.query.categoryId);
+
+    if (!Number.isInteger(categoryId) || categoryId <= 0) {
+      return res.status(400).json({ message: 'Valid categoryId is required' });
+    }
+
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `
+        SELECT id, category_id, name, slug
+        FROM subcategories
+        WHERE category_id = ?
+        ORDER BY name ASC
+      `,
+      [categoryId],
+    );
+
+    return res.status(200).json(rows);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Server error' });

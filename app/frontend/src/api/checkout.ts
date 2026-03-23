@@ -1,7 +1,7 @@
 import api from './axios';
 
 export type CheckoutPreviewResponse = {
-  customerType: 'b2c' | 'b2b';
+  customerGroupCode: string;
   items: Array<{
     productId: number;
     quantity: number;
@@ -22,8 +22,7 @@ export type CheckoutPreviewResponse = {
   };
   grandTotal: number;
 };
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const url = `${API_BASE}/api`;
+
 export const fetchCheckoutPreview = async ({
   items,
   couponCode,
@@ -31,7 +30,7 @@ export const fetchCheckoutPreview = async ({
   items: { productId: number; quantity: number }[];
   couponCode?: string;
 }) => {
-  const res = await api.post(`${url}/checkout/preview`, {
+  const res = await api.post('/checkout/preview', {
     items,
     couponCode,
   });
@@ -54,7 +53,7 @@ export const createOrder = async ({
   paymentMethod?: string;
   currency?: string;
 }) => {
-  const res = await api.post(`${url}/orders`, {
+  const res = await api.post('/orders', {
     items,
     couponCode,
     billingAddress,
