@@ -1,9 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Input, { InputType } from '../../../components/input/Input';
+import ProductImagesSortableGrid from '../../../components/productImages/ProductImageSortableGrid';
 import { fetchProductById, updateProduct } from '../../../api/product';
 import { fetchCategories, fetchSubcategories } from '../../../api/category';
-import styles from '../addProduct/AddProduct.module.scss';
+import {
+  deleteProductImage,
+  getProductImages,
+  setPrimaryProductImage,
+  updateProductImageAltText,
+  uploadProductImages,
+  type ProductImage,
+} from '../../../api/productImage';
+import styles from '../../../index.module.scss';
 
 type CategoryOption = {
   id: number;
@@ -25,7 +34,27 @@ type ProductFormState = {
   categoryId: number;
   subcategoryId: string;
   isPublished: boolean;
-  images: string[];
+  pricing: {
+    retail: {
+      priceNet: number;
+      vatRate: number;
+      priceGross: number;
+    };
+    business: {
+      priceNet: number;
+      vatRate: number;
+      priceGross: number;
+    };
+  };
+};
+
+type UpdateProductPayload = {
+  name: string;
+  description: string;
+  stock: number;
+  categoryId: number;
+  subcategoryId: number | null;
+  isPublished: boolean;
   pricing: {
     retail: {
       priceNet: number;
@@ -47,7 +76,6 @@ const emptyForm: ProductFormState = {
   categoryId: 0,
   subcategoryId: '',
   isPublished: false,
-  images: [''],
   pricing: {
     retail: {
       priceNet: 0,
@@ -66,18 +94,23 @@ const round2 = (value: number) => Math.round(value * 100) / 100;
 const grossFromNet = (net: number, vatRate: number) => round2(net * (1 + vatRate / 100));
 const netFromGross = (gross: number, vatRate: number) => round2(gross / (1 + vatRate / 100));
 
-export default function ProductDetailsPage() {
+const ProductDetailsPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  const productId = useMemo(() => Number(id), [id]);
 
   const [form, setForm] = useState<ProductFormState>(emptyForm);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryOption[]>([]);
+  const [images, setImages] = useState<ProductImage[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const [message, setMessage] = useState('');
 
-  const loadSubcategories = async (categoryId: number) => {
+  const loadSubcategories = async (categoryId: number): Promise<SubcategoryOption[]> => {
     if (!Number.isInteger(categoryId) || categoryId <= 0) {
       setSubcategories([]);
       return [];
@@ -94,25 +127,38 @@ export default function ProductDetailsPage() {
     }
   };
 
+  const loadProductImages = async (nextProductId: number): Promise<void> => {
+    try {
+      const result = await getProductImages(nextProductId);
+      setImages(result.data || []);
+    } catch (error) {
+      console.error(error);
+      setImages([]);
+    }
+  };
+
   useEffect(() => {
-    const loadCategories = async () => {
+    const loadCategories = async (): Promise<void> => {
       try {
         const data = await fetchCategories();
         setCategories(data);
-      } catch (err) {
-        console.error(err);
+      } catch (error) {
+        console.error(error);
       }
     };
 
-    loadCategories();
+    void loadCategories();
   }, []);
 
   useEffect(() => {
-    const run = async () => {
-      if (!id) return;
+    const loadPage = async (): Promise<void> => {
+      if (!productId || Number.isNaN(productId)) {
+        setLoading(false);
+        return;
+      }
 
       try {
-        const product = await fetchProductById(Number(id));
+        const product = await fetchProductById(productId);
 
         const nextForm: ProductFormState = {
           name: product.name || '',
@@ -121,17 +167,16 @@ export default function ProductDetailsPage() {
           categoryId: product.categoryId || 0,
           subcategoryId: product.subcategoryId ? String(product.subcategoryId) : '',
           isPublished: Boolean(product.isPublished),
-          images: product.images?.length ? product.images : [''],
           pricing: {
             retail: {
-              priceNet: product.pricing.retail?.priceNet ?? 0,
-              vatRate: product.pricing.retail?.vatRate ?? 25,
-              priceGross: product.pricing.retail?.priceGross ?? 0,
+              priceNet: product.pricing?.retail?.priceNet ?? 0,
+              vatRate: product.pricing?.retail?.vatRate ?? 25,
+              priceGross: product.pricing?.retail?.priceGross ?? 0,
             },
             business: {
-              priceNet: product.pricing.business?.priceNet ?? 0,
-              vatRate: product.pricing.business?.vatRate ?? 25,
-              priceGross: product.pricing.business?.priceGross ?? 0,
+              priceNet: product.pricing?.business?.priceNet ?? 0,
+              vatRate: product.pricing?.business?.vatRate ?? 25,
+              priceGross: product.pricing?.business?.priceGross ?? 0,
             },
           },
         };
@@ -147,25 +192,26 @@ export default function ProductDetailsPage() {
             nextForm.subcategoryId = '';
           }
         } else {
-          setSubcategories([]);
           nextForm.subcategoryId = '';
+          setSubcategories([]);
         }
 
         setForm(nextForm);
-      } catch (err) {
-        console.error(err);
+        await loadProductImages(productId);
+      } catch (error) {
+        console.error(error);
         setMessage('Failed to load product');
       } finally {
         setLoading(false);
       }
     };
 
-    run();
-  }, [id]);
+    void loadPage();
+  }, [productId]);
 
   const handleFieldChange = async (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
-  ) => {
+  ): Promise<void> => {
     const { name, value, type } = e.target;
 
     if (name === 'categoryId') {
@@ -182,7 +228,7 @@ export default function ProductDetailsPage() {
     }
 
     const nextValue =
-      type === 'number' ? Number(value) : type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
+      type === 'checkbox' ? (e.target as HTMLInputElement).checked : type === 'number' ? Number(value) : value;
 
     setForm((prev) => ({
       ...prev,
@@ -194,7 +240,7 @@ export default function ProductDetailsPage() {
     pricingType: 'retail' | 'business',
     field: 'priceNet' | 'priceGross' | 'vatRate',
     value: number,
-  ) => {
+  ): void => {
     setForm((prev) => {
       const nextPricing = {
         ...prev.pricing[pricingType],
@@ -219,34 +265,100 @@ export default function ProductDetailsPage() {
     });
   };
 
-  const handleImageChange = (index: number, value: string) => {
-    setForm((prev) => {
-      const nextImages = [...prev.images];
-      nextImages[index] = value;
+  const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const fileList = e.target.files;
 
-      return {
-        ...prev,
-        images: nextImages,
-      };
-    });
+    if (!fileList) {
+      setSelectedFiles([]);
+      return;
+    }
+
+    setSelectedFiles(Array.from(fileList));
   };
 
-  const addImageField = () => {
-    setForm((prev) => ({
-      ...prev,
-      images: [...prev.images, ''],
-    }));
+  const handleUploadImages = async (): Promise<void> => {
+    if (!productId || selectedFiles.length === 0) {
+      return;
+    }
+
+    setUploadingImages(true);
+    setMessage('');
+
+    try {
+      await uploadProductImages(productId, selectedFiles);
+      setSelectedFiles([]);
+      await loadProductImages(productId);
+      setMessage('✅ Images uploaded successfully');
+    } catch (error) {
+      console.error(error);
+      setMessage('❌ Failed to upload images');
+    } finally {
+      setUploadingImages(false);
+    }
   };
 
-  const removeImageField = (index: number) => {
-    setForm((prev) => {
-      const nextImages = prev.images.filter((_, i) => i !== index);
+  const handleSetPrimary = async (imageId: number): Promise<void> => {
+    if (!productId) {
+      return;
+    }
 
-      return {
-        ...prev,
-        images: nextImages.length ? nextImages : [''],
-      };
-    });
+    try {
+      await setPrimaryProductImage(productId, imageId);
+
+      setImages((prev) =>
+        prev.map((image) => ({
+          ...image,
+          is_primary: image.id === imageId ? 1 : 0,
+        })),
+      );
+    } catch (error) {
+      console.error(error);
+      setMessage('❌ Failed to update primary image');
+    }
+  };
+
+  const handleDeleteImage = async (imageId: number): Promise<void> => {
+    try {
+      await deleteProductImage(imageId);
+
+      setImages((prev) =>
+        prev
+          .filter((image) => image.id !== imageId)
+          .map((image, index) => ({
+            ...image,
+            sort_order: index,
+          })),
+      );
+    } catch (error) {
+      console.error(error);
+      setMessage('❌ Failed to delete image');
+    }
+  };
+
+  const handleEditAltText = async (image: ProductImage): Promise<void> => {
+    const altText = window.prompt('Enter alt text', image.alt_text || '');
+
+    if (altText === null) {
+      return;
+    }
+
+    try {
+      await updateProductImageAltText(image.id, altText);
+
+      setImages((prev) =>
+        prev.map((item) =>
+          item.id === image.id
+            ? {
+                ...item,
+                alt_text: altText || null,
+              }
+            : item,
+        ),
+      );
+    } catch (error) {
+      console.error(error);
+      setMessage('❌ Failed to update alt text');
+    }
   };
 
   const baseInputs: InputType[] = [
@@ -275,21 +387,23 @@ export default function ProductDetailsPage() {
     },
   ];
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
-    if (!id) return;
+
+    if (!productId) {
+      return;
+    }
 
     setSaving(true);
     setMessage('');
 
     try {
-      const payload = {
+      const payload: UpdateProductPayload = {
         name: form.name.trim(),
         description: form.description.trim(),
         stock: Number(form.stock),
         categoryId: Number(form.categoryId),
         subcategoryId: form.subcategoryId ? Number(form.subcategoryId) : null,
-        images: form.images.filter((url) => url.trim() !== ''),
         isPublished: form.isPublished,
         pricing: {
           retail: {
@@ -305,11 +419,12 @@ export default function ProductDetailsPage() {
         },
       };
 
-      await updateProduct(Number(id), payload);
+      await updateProduct(productId, payload);
+      await loadProductImages(productId);
       setMessage('✅ Product updated successfully');
-    } catch (err: any) {
-      console.error(err);
-      setMessage(err?.response?.data?.message || '❌ Failed to update product');
+    } catch (error: any) {
+      console.error(error);
+      setMessage(error?.response?.data?.message || '❌ Failed to update product');
     } finally {
       setSaving(false);
     }
@@ -322,22 +437,23 @@ export default function ProductDetailsPage() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h2>Edit Product</h2>
+        <h2 className={styles.title}>Edit Product</h2>
         {message && <p className={styles.message}>{message}</p>}
       </div>
 
       <form onSubmit={handleSubmit} className={styles.form}>
         <div className={styles.grid}>
-          {baseInputs.map((input, i) => (
-            <div key={i}>
+          {baseInputs.map((input, index) => (
+            <div key={index}>
               <Input {...input} />
             </div>
           ))}
 
-          <div>
+          <div className={styles.field}>
             <label htmlFor="categoryId" className={styles.label}>
               Category
             </label>
+
             <select
               id="categoryId"
               name="categoryId"
@@ -355,10 +471,11 @@ export default function ProductDetailsPage() {
             </select>
           </div>
 
-          <div>
+          <div className={styles.field}>
             <label htmlFor="subcategoryId" className={styles.label}>
               Subcategory
             </label>
+
             <select
               id="subcategoryId"
               name="subcategoryId"
@@ -381,6 +498,7 @@ export default function ProductDetailsPage() {
           <label htmlFor="description" className={styles.label}>
             Description
           </label>
+
           <textarea
             id="description"
             name="description"
@@ -392,39 +510,58 @@ export default function ProductDetailsPage() {
           />
         </div>
 
-        <div className={styles.imageSection}>
+        <section className={styles.imageSection}>
           <div className={styles.sectionHeader}>
-            <h3>Images</h3>
-            <button type="button" onClick={addImageField} className={styles.secondaryButton}>
-              Add image
-            </button>
+            <h3>Product Images</h3>
           </div>
 
-          <div className={styles.imageGrid}>
-            {form.images.map((image, index) => (
-              <div key={index} className={styles.imageRow}>
-                <Input
-                  inputProps={{
-                    type: 'text',
-                    placeholder: 'Image URL',
-                    value: image,
-                    onChange: (e) => handleImageChange(index, e.target.value),
-                  }}
-                  label={{ text: `Image ${index + 1}` }}
-                />
+          <div className={styles.uploadBox}>
+            <label htmlFor="productImages" className={styles.label}>
+              Upload new images
+            </label>
 
-                <button
-                  type="button"
-                  onClick={() => removeImageField(index)}
-                  className={styles.removeButton}
-                  disabled={form.images.length === 1}
-                >
-                  Remove
-                </button>
+            <input
+              id="productImages"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/avif"
+              multiple
+              onChange={handleFileSelection}
+              className={styles.fileInput}
+            />
+
+            {selectedFiles.length > 0 && (
+              <div className={styles.selectedFiles}>
+                {selectedFiles.map((file) => (
+                  <span key={`${file.name}-${file.lastModified}`} className={styles.fileTag}>
+                    {file.name}
+                  </span>
+                ))}
               </div>
-            ))}
+            )}
+
+            <div className={styles.imageActions}>
+              <button
+                type="button"
+                onClick={handleUploadImages}
+                className={styles.secondaryButton}
+                disabled={uploadingImages || selectedFiles.length === 0}
+              >
+                {uploadingImages ? 'Uploading...' : 'Upload selected images'}
+              </button>
+            </div>
           </div>
-        </div>
+
+          <div className={styles.imageGridWrapper}>
+            <ProductImagesSortableGrid
+              productId={productId}
+              images={images}
+              onImagesChange={setImages}
+              onSetPrimary={handleSetPrimary}
+              onDelete={handleDeleteImage}
+              onEditAltText={handleEditAltText}
+            />
+          </div>
+        </section>
 
         <div className={styles.pricingGrid}>
           <div className={styles.pricingCard}>
@@ -515,4 +652,6 @@ export default function ProductDetailsPage() {
       </form>
     </div>
   );
-}
+};
+
+export default ProductDetailsPage;

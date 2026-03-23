@@ -45,7 +45,7 @@ export const getProducts = async (req: Request, res: Response) => {
 
 export const addProduct = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, stock, categoryId, subcategoryId, images, isPublished, pricing } = req.body;
+    const { name, description, stock, categoryId, subcategoryId, isPublished, pricing } = req.body;
 
     if (name == null || stock == null || categoryId == null || !pricing) {
       return res.status(400).json({
@@ -71,20 +71,6 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
       (!Number.isInteger(Number(subcategoryId)) || Number(subcategoryId) <= 0)
     ) {
       return res.status(400).json({ message: 'Valid subcategoryId is required' });
-    }
-
-    if (images && !Array.isArray(images)) {
-      return res.status(400).json({ message: 'Images must be an array of URLs' });
-    }
-
-    if (Array.isArray(images)) {
-      const invalidImage = images.some((url) => typeof url !== 'string' || !url.trim());
-
-      if (invalidImage) {
-        return res.status(400).json({
-          message: 'All images must be valid non-empty URLs',
-        });
-      }
     }
 
     if (
@@ -124,7 +110,6 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
       stock,
       categoryId: normalizedCategoryId,
       subcategoryId: normalizedSubcategoryId,
-      images: Array.isArray(images) ? images : [],
       isPublished: Boolean(isPublished),
       pricing: {
         retail: {
@@ -230,7 +215,7 @@ export const deleteProductsBulk = async (req: AuthRequest, res: Response) => {
 export const getProductById = async (req: Request, res: Response) => {
   try {
     const productId = Number(req.params.id);
-    console.log('productId', productId);
+
     if (!Number.isInteger(productId) || productId <= 0) {
       return res.status(400).json({ message: 'Valid product id is required' });
     }
@@ -251,7 +236,7 @@ export const getProductById = async (req: Request, res: Response) => {
 export const updateProduct = async (req: AuthRequest, res: Response) => {
   try {
     const productId = Number(req.params.id);
-    const { name, description, stock, categoryId, subcategoryId, images, isPublished, pricing } = req.body;
+    const { name, description, stock, categoryId, subcategoryId, isPublished, pricing } = req.body;
 
     if (!Number.isInteger(productId) || productId <= 0) {
       return res.status(400).json({ message: 'Valid product id is required' });
@@ -281,20 +266,6 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
       (!Number.isInteger(Number(subcategoryId)) || Number(subcategoryId) <= 0)
     ) {
       return res.status(400).json({ message: 'Valid subcategoryId is required' });
-    }
-
-    if (images && !Array.isArray(images)) {
-      return res.status(400).json({ message: 'Images must be an array of URLs' });
-    }
-
-    if (Array.isArray(images)) {
-      const invalidImage = images.some((url) => typeof url !== 'string' || !url.trim());
-
-      if (invalidImage) {
-        return res.status(400).json({
-          message: 'All images must be valid non-empty URLs',
-        });
-      }
     }
 
     if (
@@ -335,7 +306,6 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
       stock,
       categoryId: normalizedCategoryId,
       subcategoryId: normalizedSubcategoryId,
-      images: Array.isArray(images) ? images : [],
       isPublished: Boolean(isPublished),
       pricing: {
         retail: {

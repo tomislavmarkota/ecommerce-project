@@ -14,6 +14,7 @@ const containerClient = blobServiceClient.getContainerClient(containerName);
 
 export async function ensureBlobContainer(): Promise<void> {
   await containerClient.createIfNotExists();
+  await containerClient.setAccessPolicy('blob');
 }
 
 export async function uploadBufferToBlob(params: {

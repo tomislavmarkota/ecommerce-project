@@ -27,23 +27,25 @@ type CountRow = RowDataPacket & {
   total: number;
 };
 
+type PriceListRow = RowDataPacket & {
+  id: number;
+  code: string;
+};
+
 type CreateProductParams = {
   name: string;
   description: string;
   stock: number;
   categoryId: number;
   subcategoryId: number | null;
-  images: string[];
   isPublished: boolean;
   pricing: {
     retail: {
-      priceListId: number;
       priceNet: number;
       vatRate: number;
       priceGross: number;
     };
     business: {
-      priceListId: number;
       priceNet: number;
       vatRate: number;
       priceGross: number;
@@ -51,9 +53,62 @@ type CreateProductParams = {
   };
 };
 
-type PriceListRow = RowDataPacket & {
+type ProductDetailsRow = RowDataPacket & {
   id: number;
+  name: string;
+  description: string | null;
+  stock: number;
+  is_published: number;
+  category_id: number | null;
+  subcategory_id: number | null;
+  created_at: string;
+};
+
+type ProductPriceRow = RowDataPacket & {
   code: string;
+  price_net: string;
+  vat_rate: string;
+  price_gross: string;
+};
+
+type ProductImageRow = RowDataPacket & {
+  id: number;
+  product_id: number;
+  blob_name: string;
+  image_url: string;
+  thumbnail_blob_name: string | null;
+  thumbnail_url: string | null;
+  alt_text: string | null;
+  sort_order: number;
+  is_primary: number;
+  mime_type: string | null;
+  file_size: number | null;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type UpdateProductParams = {
+  productId: number;
+  name: string;
+  description: string;
+  stock: number;
+  categoryId: number;
+  subcategoryId: number | null;
+  isPublished: boolean;
+  pricing: {
+    retail: {
+      priceNet: number;
+      vatRate: number;
+      priceGross: number;
+    };
+    business: {
+      priceNet: number;
+      vatRate: number;
+      priceGross: number;
+    };
+  };
 };
 
 export const getAdminPriceListIds = async () => {
@@ -109,10 +164,10 @@ export const getProductsList = async ({ page, limit, search, sortBy, sortOrder }
       c.name AS category_name,
       sc.name AS subcategory_name,
       (
-        SELECT pi.image_url
+        SELECT COALESCE(pi.thumbnail_url, pi.image_url)
         FROM product_images pi
         WHERE pi.product_id = p.id
-        ORDER BY pi.sort_order ASC, pi.id ASC
+        ORDER BY pi.is_primary DESC, pi.sort_order ASC, pi.id ASC
         LIMIT 1
       ) AS thumbnail,
       (
@@ -185,12 +240,14 @@ export const createProduct = async ({
   stock,
   categoryId,
   subcategoryId,
-  images,
   isPublished,
   pricing,
 }: CreateProductParams) => {
   const connection = await pool.getConnection();
+
   try {
+    const { retailPriceListId, businessPriceListId } = await getAdminPriceListIds();
+
     await connection.beginTransaction();
 
     const [result] = await connection.query<ResultSetHeader>(
@@ -221,31 +278,18 @@ export const createProduct = async ({
           (?, ?, ?, ?, ?)
       `,
       [
-        pricing.retail.priceListId,
+        retailPriceListId,
         productId,
         pricing.retail.priceNet,
         pricing.retail.vatRate,
         pricing.retail.priceGross,
-        pricing.business.priceListId,
+        businessPriceListId,
         productId,
         pricing.business.priceNet,
         pricing.business.vatRate,
         pricing.business.priceGross,
       ],
     );
-
-    if (images.length > 0) {
-      const values = images.map((url, index) => [productId, url, index]);
-
-      await connection.query(
-        `
-          INSERT INTO product_images
-            (product_id, image_url, sort_order)
-          VALUES ?
-        `,
-        [values],
-      );
-    }
 
     await connection.commit();
 
@@ -260,26 +304,27 @@ export const createProduct = async ({
 
 export const updateProductPrices = async ({
   productId,
-  retail,
-  business,
+  pricing,
 }: {
   productId: number;
-  retail: {
-    priceListId: number;
-    priceNet: number;
-    vatRate: number;
-    priceGross: number;
-  };
-  business: {
-    priceListId: number;
-    priceNet: number;
-    vatRate: number;
-    priceGross: number;
+  pricing: {
+    retail: {
+      priceNet: number;
+      vatRate: number;
+      priceGross: number;
+    };
+    business: {
+      priceNet: number;
+      vatRate: number;
+      priceGross: number;
+    };
   };
 }) => {
   const connection = await pool.getConnection();
 
   try {
+    const { retailPriceListId, businessPriceListId } = await getAdminPriceListIds();
+
     await connection.beginTransaction();
 
     await connection.query(
@@ -296,16 +341,16 @@ export const updateProductPrices = async ({
           updated_at = CURRENT_TIMESTAMP
       `,
       [
-        retail.priceListId,
+        retailPriceListId,
         productId,
-        retail.priceNet,
-        retail.vatRate,
-        retail.priceGross,
-        business.priceListId,
+        pricing.retail.priceNet,
+        pricing.retail.vatRate,
+        pricing.retail.priceGross,
+        businessPriceListId,
         productId,
-        business.priceNet,
-        business.vatRate,
-        business.priceGross,
+        pricing.business.priceNet,
+        pricing.business.vatRate,
+        pricing.business.priceGross,
       ],
     );
 
@@ -343,30 +388,6 @@ export const deleteProductsByIds = async (ids: number[]) => {
   } finally {
     connection.release();
   }
-};
-
-type ProductDetailsRow = RowDataPacket & {
-  id: number;
-  name: string;
-  description: string | null;
-  stock: number;
-  is_published: number;
-  category_id: number | null;
-  subcategory_id: number | null;
-  created_at: string;
-};
-
-type ProductPriceRow = RowDataPacket & {
-  code: string;
-  price_net: string;
-  vat_rate: string;
-  price_gross: string;
-};
-
-type ProductImageRow = RowDataPacket & {
-  id: number;
-  image_url: string;
-  sort_order: number;
 };
 
 export const getProductById = async (productId: number) => {
@@ -412,17 +433,29 @@ export const getProductById = async (productId: number) => {
     `
       SELECT
         id,
+        product_id,
+        blob_name,
         image_url,
-        sort_order
+        thumbnail_blob_name,
+        thumbnail_url,
+        alt_text,
+        sort_order,
+        is_primary,
+        mime_type,
+        file_size,
+        width,
+        height,
+        created_at,
+        updated_at
       FROM product_images
       WHERE product_id = ?
-      ORDER BY sort_order ASC, id ASC
+      ORDER BY is_primary DESC, sort_order ASC, id ASC
     `,
     [productId],
   );
 
-  const retail = priceRows.find((row) => row.code === 'retail-eur');
-  const business = priceRows.find((row) => row.code === 'business-eur');
+  const retail = priceRows.find((row) => row.code === PRICE_LIST_CODES.RETAIL_EUR);
+  const business = priceRows.find((row) => row.code === PRICE_LIST_CODES.BUSINESS_EUR);
 
   return {
     id: product.id,
@@ -433,7 +466,23 @@ export const getProductById = async (productId: number) => {
     subcategoryId: product.subcategory_id,
     isPublished: Boolean(product.is_published),
     createdAt: product.created_at,
-    images: imageRows.map((row) => row.image_url),
+    images: imageRows.map((row) => ({
+      id: row.id,
+      product_id: row.product_id,
+      blob_name: row.blob_name,
+      image_url: row.image_url,
+      thumbnail_blob_name: row.thumbnail_blob_name,
+      thumbnail_url: row.thumbnail_url,
+      alt_text: row.alt_text,
+      sort_order: row.sort_order,
+      is_primary: row.is_primary,
+      mime_type: row.mime_type,
+      file_size: row.file_size,
+      width: row.width,
+      height: row.height,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    })),
     pricing: {
       retail: retail
         ? {
@@ -453,29 +502,6 @@ export const getProductById = async (productId: number) => {
   };
 };
 
-type UpdateProductParams = {
-  productId: number;
-  name: string;
-  description: string;
-  stock: number;
-  categoryId: number;
-  subcategoryId: number | null;
-  images: string[];
-  isPublished: boolean;
-  pricing: {
-    retail: {
-      priceNet: number;
-      vatRate: number;
-      priceGross: number;
-    };
-    business: {
-      priceNet: number;
-      vatRate: number;
-      priceGross: number;
-    };
-  };
-};
-
 export const updateProductById = async ({
   productId,
   name,
@@ -483,7 +509,6 @@ export const updateProductById = async ({
   stock,
   categoryId,
   subcategoryId,
-  images,
   isPublished,
   pricing,
 }: UpdateProductParams) => {
@@ -508,27 +533,6 @@ export const updateProductById = async ({
       `,
       [name, description, stock, categoryId, subcategoryId, isPublished, productId],
     );
-
-    await connection.query(
-      `
-        DELETE FROM product_images
-        WHERE product_id = ?
-      `,
-      [productId],
-    );
-
-    if (images.length > 0) {
-      const values = images.map((url, index) => [productId, url, index]);
-
-      await connection.query(
-        `
-          INSERT INTO product_images
-            (product_id, image_url, sort_order)
-          VALUES ?
-        `,
-        [values],
-      );
-    }
 
     await connection.query(
       `
