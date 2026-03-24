@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Input, { InputType } from '../../../components/input/Input';
 import ProductImagesSortableGrid from '../../../components/productImages/ProductImageSortableGrid';
+import MultiImageUpload from '../../../components/multiImageUpload/MultiImageUpload';
 import { fetchProductById, updateProduct } from '../../../api/product';
 import { fetchCategories, fetchSubcategories } from '../../../api/category';
 import {
@@ -12,7 +13,7 @@ import {
   uploadProductImages,
   type ProductImage,
 } from '../../../api/productImage';
-import styles from '../../../index.module.scss';
+import styles from './productDetails.module.scss';
 
 type CategoryOption = {
   id: number;
@@ -69,6 +70,16 @@ type UpdateProductPayload = {
   };
 };
 
+type UploadFailedFile = {
+  fileName: string;
+  message?: string;
+};
+
+type UploadImagesResult = {
+  uploadedCount: number;
+  failedFiles: UploadFailedFile[];
+};
+
 const emptyForm: ProductFormState = {
   name: '',
   description: '',
@@ -90,9 +101,9 @@ const emptyForm: ProductFormState = {
   },
 };
 
-const round2 = (value: number) => Math.round(value * 100) / 100;
-const grossFromNet = (net: number, vatRate: number) => round2(net * (1 + vatRate / 100));
-const netFromGross = (gross: number, vatRate: number) => round2(gross / (1 + vatRate / 100));
+const round2 = (value: number): number => Math.round(value * 100) / 100;
+const grossFromNet = (net: number, vatRate: number): number => round2(net * (1 + vatRate / 100));
+const netFromGross = (gross: number, vatRate: number): number => round2(gross / (1 + vatRate / 100));
 
 const ProductDetailsPage: React.FC = () => {
   const { id } = useParams();
@@ -104,7 +115,6 @@ const ProductDetailsPage: React.FC = () => {
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryOption[]>([]);
   const [images, setImages] = useState<ProductImage[]>([]);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -265,33 +275,44 @@ const ProductDetailsPage: React.FC = () => {
     });
   };
 
-  const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const fileList = e.target.files;
-
-    if (!fileList) {
-      setSelectedFiles([]);
-      return;
-    }
-
-    setSelectedFiles(Array.from(fileList));
-  };
-
-  const handleUploadImages = async (): Promise<void> => {
-    if (!productId || selectedFiles.length === 0) {
-      return;
+  const handleUploadImages = async (
+    files: File[],
+    onProgress: (file: File, progress: number) => void,
+  ): Promise<UploadImagesResult> => {
+    if (!productId || files.length === 0) {
+      return {
+        uploadedCount: 0,
+        failedFiles: [],
+      };
     }
 
     setUploadingImages(true);
     setMessage('');
 
     try {
-      await uploadProductImages(productId, selectedFiles);
-      setSelectedFiles([]);
+      const result = await uploadProductImages(productId, files, onProgress);
       await loadProductImages(productId);
-      setMessage('✅ Images uploaded successfully');
-    } catch (error) {
+
+      if (result.failedFiles.length > 0 && result.uploadedCount > 0) {
+        setMessage('Some images were uploaded, but a few failed.');
+      } else if (result.failedFiles.length > 0) {
+        setMessage('Failed to upload images.');
+      } else {
+        setMessage('✅ Images uploaded successfully');
+      }
+
+      return result;
+    } catch (error: any) {
       console.error(error);
-      setMessage('❌ Failed to upload images');
+      setMessage(error?.response?.data?.message || '❌ Failed to upload images');
+
+      return {
+        uploadedCount: 0,
+        failedFiles: files.map((file) => ({
+          fileName: file.name,
+          message: 'Upload failed',
+        })),
+      };
     } finally {
       setUploadingImages(false);
     }
@@ -311,6 +332,8 @@ const ProductDetailsPage: React.FC = () => {
           is_primary: image.id === imageId ? 1 : 0,
         })),
       );
+
+      setMessage('Primary image updated successfully');
     } catch (error) {
       console.error(error);
       setMessage('❌ Failed to update primary image');
@@ -329,6 +352,8 @@ const ProductDetailsPage: React.FC = () => {
             sort_order: index,
           })),
       );
+
+      setMessage('Image deleted successfully');
     } catch (error) {
       console.error(error);
       setMessage('❌ Failed to delete image');
@@ -355,6 +380,8 @@ const ProductDetailsPage: React.FC = () => {
             : item,
         ),
       );
+
+      setMessage('Alt text updated successfully');
     } catch (error) {
       console.error(error);
       setMessage('❌ Failed to update alt text');
@@ -420,7 +447,6 @@ const ProductDetailsPage: React.FC = () => {
       };
 
       await updateProduct(productId, payload);
-      await loadProductImages(productId);
       setMessage('✅ Product updated successfully');
     } catch (error: any) {
       console.error(error);
@@ -430,225 +456,277 @@ const ProductDetailsPage: React.FC = () => {
     }
   };
 
+  const selectedCategory = categories.find((category) => category.id === form.categoryId);
+  const selectedSubcategory = subcategories.find((subcategory) => String(subcategory.id) === form.subcategoryId);
+
   if (loading) {
-    return <div className={styles.page}>Loading product...</div>;
+    return <div className={styles.pageState}>Loading product...</div>;
+  }
+
+  if (!productId || Number.isNaN(productId)) {
+    return <div className={styles.pageState}>Product not found</div>;
   }
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <h2 className={styles.title}>Edit Product</h2>
-        {message && <p className={styles.message}>{message}</p>}
-      </div>
-
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.grid}>
-          {baseInputs.map((input, index) => (
-            <div key={index}>
-              <Input {...input} />
-            </div>
-          ))}
-
-          <div className={styles.field}>
-            <label htmlFor="categoryId" className={styles.label}>
-              Category
-            </label>
-
-            <select
-              id="categoryId"
-              name="categoryId"
-              value={form.categoryId || ''}
-              onChange={handleFieldChange}
-              className={styles.select}
-              required
-            >
-              <option value="">Select category</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className={styles.field}>
-            <label htmlFor="subcategoryId" className={styles.label}>
-              Subcategory
-            </label>
-
-            <select
-              id="subcategoryId"
-              name="subcategoryId"
-              value={form.subcategoryId}
-              onChange={handleFieldChange}
-              className={styles.select}
-              disabled={!form.categoryId}
-            >
-              <option value="">Select subcategory</option>
-              {subcategories.map((subcategory) => (
-                <option key={subcategory.id} value={subcategory.id}>
-                  {subcategory.name}
-                </option>
-              ))}
-            </select>
-          </div>
+      <div className={styles.pageHeader}>
+        <div>
+          <p className={styles.eyebrow}>E-commerce / Products</p>
+          <h1 className={styles.pageTitle}>Product details</h1>
         </div>
 
-        <div className={styles.field}>
-          <label htmlFor="description" className={styles.label}>
-            Description
-          </label>
-
-          <textarea
-            id="description"
-            name="description"
-            placeholder="Product description"
-            value={form.description}
-            onChange={handleFieldChange}
-            rows={5}
-            className={styles.textarea}
-          />
-        </div>
-
-        <section className={styles.imageSection}>
-          <div className={styles.sectionHeader}>
-            <h3>Product Images</h3>
-          </div>
-
-          <div className={styles.uploadBox}>
-            <label htmlFor="productImages" className={styles.label}>
-              Upload new images
-            </label>
-
-            <input
-              id="productImages"
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/avif"
-              multiple
-              onChange={handleFileSelection}
-              className={styles.fileInput}
-            />
-
-            {selectedFiles.length > 0 && (
-              <div className={styles.selectedFiles}>
-                {selectedFiles.map((file) => (
-                  <span key={`${file.name}-${file.lastModified}`} className={styles.fileTag}>
-                    {file.name}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <div className={styles.imageActions}>
-              <button
-                type="button"
-                onClick={handleUploadImages}
-                className={styles.secondaryButton}
-                disabled={uploadingImages || selectedFiles.length === 0}
-              >
-                {uploadingImages ? 'Uploading...' : 'Upload selected images'}
-              </button>
-            </div>
-          </div>
-
-          <div className={styles.imageGridWrapper}>
-            <ProductImagesSortableGrid
-              productId={productId}
-              images={images}
-              onImagesChange={setImages}
-              onSetPrimary={handleSetPrimary}
-              onDelete={handleDeleteImage}
-              onEditAltText={handleEditAltText}
-            />
-          </div>
-        </section>
-
-        <div className={styles.pricingGrid}>
-          <div className={styles.pricingCard}>
-            <h3>Retail Pricing</h3>
-
-            <Input
-              inputProps={{
-                type: 'number',
-                step: '0.01',
-                value: form.pricing.retail.priceNet,
-                onChange: (e) => handlePricingChange('retail', 'priceNet', Number(e.target.value)),
-              }}
-              label={{ text: 'Net price' }}
-            />
-
-            <Input
-              inputProps={{
-                type: 'number',
-                step: '0.01',
-                value: form.pricing.retail.vatRate,
-                onChange: (e) => handlePricingChange('retail', 'vatRate', Number(e.target.value)),
-              }}
-              label={{ text: 'VAT rate (%)' }}
-            />
-
-            <Input
-              inputProps={{
-                type: 'number',
-                step: '0.01',
-                value: form.pricing.retail.priceGross,
-                onChange: (e) => handlePricingChange('retail', 'priceGross', Number(e.target.value)),
-              }}
-              label={{ text: 'Gross price' }}
-            />
-          </div>
-
-          <div className={styles.pricingCard}>
-            <h3>Business Pricing</h3>
-
-            <Input
-              inputProps={{
-                type: 'number',
-                step: '0.01',
-                value: form.pricing.business.priceNet,
-                onChange: (e) => handlePricingChange('business', 'priceNet', Number(e.target.value)),
-              }}
-              label={{ text: 'Net price' }}
-            />
-
-            <Input
-              inputProps={{
-                type: 'number',
-                step: '0.01',
-                value: form.pricing.business.vatRate,
-                onChange: (e) => handlePricingChange('business', 'vatRate', Number(e.target.value)),
-              }}
-              label={{ text: 'VAT rate (%)' }}
-            />
-
-            <Input
-              inputProps={{
-                type: 'number',
-                step: '0.01',
-                value: form.pricing.business.priceGross,
-                onChange: (e) => handlePricingChange('business', 'priceGross', Number(e.target.value)),
-              }}
-              label={{ text: 'Gross price' }}
-            />
-          </div>
-        </div>
-
-        <div className={styles.checkboxRow}>
-          <label className={styles.checkboxLabel}>
-            <input type="checkbox" name="isPublished" checked={form.isPublished} onChange={handleFieldChange} />
-            <span>Published</span>
-          </label>
-        </div>
-
-        <div className={styles.actions}>
-          <button type="button" className={styles.secondaryButton} onClick={() => navigate('/product')}>
+        <div className={styles.headerActions}>
+          <button type="button" className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => navigate('/product')}>
             Back
           </button>
 
-          <button type="submit" className={styles.primaryButton} disabled={saving}>
-            {saving ? 'Saving...' : 'Save Product'}
+          <button
+            type="submit"
+            form="product-details-form"
+            className={`${styles.btn} ${styles.btnPrimary}`}
+            disabled={saving}
+          >
+            {saving ? 'Saving...' : 'Save product'}
           </button>
         </div>
+      </div>
+
+      {message && <div className={styles.alert}>{message}</div>}
+
+      <section className={styles.infoCard}>
+        <div className={styles.infoLeft}>
+          <div className={styles.productAvatar}>{form.name?.slice(0, 1).toUpperCase() || 'P'}</div>
+
+          <div>
+            <h2 className={styles.productName}>{form.name || 'Unnamed product'}</h2>
+            <p className={styles.joinedText}>Product ID: {productId}</p>
+
+            <div className={styles.roleRow}>
+              <span className={`${styles.badge} ${form.isPublished ? styles.published : styles.draft}`}>
+                {form.isPublished ? 'Published' : 'Draft'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.infoRight}>
+          <div className={styles.infoBlock}>
+            <span className={styles.infoLabel}>Category</span>
+            <strong>{selectedCategory?.name || 'No category selected'}</strong>
+          </div>
+
+          <div className={styles.infoBlock}>
+            <span className={styles.infoLabel}>Subcategory</span>
+            <strong>{selectedSubcategory?.name || 'No subcategory selected'}</strong>
+          </div>
+
+          <div className={styles.infoBlock}>
+            <span className={styles.infoLabel}>Stock</span>
+            <strong>{form.stock}</strong>
+          </div>
+        </div>
+      </section>
+
+      <form id="product-details-form" onSubmit={handleSubmit} className={styles.formLayout}>
+        <section className={styles.sectionCard}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <h3>General information</h3>
+              <p>Manage base product details and category assignment.</p>
+            </div>
+          </div>
+
+          <div className={styles.sectionBody}>
+            <div className={styles.formGrid}>
+              {baseInputs.map((input, index) => (
+                <div key={index}>
+                  <Input {...input} />
+                </div>
+              ))}
+
+              <div className={styles.field}>
+                <label htmlFor="categoryId" className={styles.label}>
+                  Category
+                </label>
+
+                <select
+                  id="categoryId"
+                  name="categoryId"
+                  value={form.categoryId || ''}
+                  onChange={handleFieldChange}
+                  className={styles.select}
+                  required
+                >
+                  <option value="">Select category</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.field}>
+                <label htmlFor="subcategoryId" className={styles.label}>
+                  Subcategory
+                </label>
+
+                <select
+                  id="subcategoryId"
+                  name="subcategoryId"
+                  value={form.subcategoryId}
+                  onChange={handleFieldChange}
+                  className={styles.select}
+                  disabled={!form.categoryId}
+                >
+                  <option value="">Select subcategory</option>
+                  {subcategories.map((subcategory) => (
+                    <option key={subcategory.id} value={subcategory.id}>
+                      {subcategory.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="description" className={styles.label}>
+                Description
+              </label>
+
+              <textarea
+                id="description"
+                name="description"
+                placeholder="Product description"
+                value={form.description}
+                onChange={handleFieldChange}
+                rows={6}
+                className={styles.textarea}
+              />
+            </div>
+
+            <div className={styles.checkboxRow}>
+              <label className={styles.checkboxLabel}>
+                <input type="checkbox" name="isPublished" checked={form.isPublished} onChange={handleFieldChange} />
+                <span>Published</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.sectionCard}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <h3>Product images</h3>
+              <p>Upload, preview, manage, and reorder product images.</p>
+            </div>
+          </div>
+
+          <div className={styles.sectionBody}>
+            <MultiImageUpload
+              disabled={uploadingImages}
+              maxFiles={10}
+              maxFileSizeMb={5}
+              accept={['image/jpeg', 'image/png', 'image/webp', 'image/avif']}
+              onUpload={handleUploadImages}
+              onUploaded={() => {
+                setMessage('✅ Images uploaded successfully');
+              }}
+            />
+
+            <div className={styles.imageGridWrapper}>
+              <ProductImagesSortableGrid
+                productId={productId}
+                images={images}
+                onImagesChange={setImages}
+                onSetPrimary={handleSetPrimary}
+                onDelete={handleDeleteImage}
+                onEditAltText={handleEditAltText}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.sectionCard}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <h3>Pricing</h3>
+              <p>Maintain separate retail and business pricing structures.</p>
+            </div>
+          </div>
+
+          <div className={styles.sectionBody}>
+            <div className={styles.pricingGrid}>
+              <div className={styles.pricingCard}>
+                <h4 className={styles.pricingTitle}>Retail pricing</h4>
+
+                <Input
+                  inputProps={{
+                    type: 'number',
+                    step: '0.01',
+                    value: form.pricing.retail.priceNet,
+                    onChange: (e) => handlePricingChange('retail', 'priceNet', Number(e.target.value)),
+                  }}
+                  label={{ text: 'Net price' }}
+                />
+
+                <Input
+                  inputProps={{
+                    type: 'number',
+                    step: '0.01',
+                    value: form.pricing.retail.vatRate,
+                    onChange: (e) => handlePricingChange('retail', 'vatRate', Number(e.target.value)),
+                  }}
+                  label={{ text: 'VAT rate (%)' }}
+                />
+
+                <Input
+                  inputProps={{
+                    type: 'number',
+                    step: '0.01',
+                    value: form.pricing.retail.priceGross,
+                    onChange: (e) => handlePricingChange('retail', 'priceGross', Number(e.target.value)),
+                  }}
+                  label={{ text: 'Gross price' }}
+                />
+              </div>
+
+              <div className={styles.pricingCard}>
+                <h4 className={styles.pricingTitle}>Business pricing</h4>
+
+                <Input
+                  inputProps={{
+                    type: 'number',
+                    step: '0.01',
+                    value: form.pricing.business.priceNet,
+                    onChange: (e) => handlePricingChange('business', 'priceNet', Number(e.target.value)),
+                  }}
+                  label={{ text: 'Net price' }}
+                />
+
+                <Input
+                  inputProps={{
+                    type: 'number',
+                    step: '0.01',
+                    value: form.pricing.business.vatRate,
+                    onChange: (e) => handlePricingChange('business', 'vatRate', Number(e.target.value)),
+                  }}
+                  label={{ text: 'VAT rate (%)' }}
+                />
+
+                <Input
+                  inputProps={{
+                    type: 'number',
+                    step: '0.01',
+                    value: form.pricing.business.priceGross,
+                    onChange: (e) => handlePricingChange('business', 'priceGross', Number(e.target.value)),
+                  }}
+                  label={{ text: 'Gross price' }}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
       </form>
     </div>
   );

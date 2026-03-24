@@ -10,25 +10,67 @@ export type ProductImage = {
   is_primary: number;
 };
 
+type UploadFailedFile = {
+  fileName: string;
+  message?: string;
+};
+
+type UploadProductImagesResult = {
+  uploadedCount: number;
+  failedFiles: UploadFailedFile[];
+};
+
 export const getProductImages = async (productId: number) => {
   const res = await api.get(`/product-images/product/${productId}`);
   return res.data as { data: ProductImage[] };
 };
 
-export const uploadProductImages = async (productId: number, files: File[]) => {
-  const formData = new FormData();
+export const uploadProductImages = async (
+  productId: number,
+  files: File[],
+  onProgress?: (file: File, progress: number) => void,
+): Promise<UploadProductImagesResult> => {
+  const results = await Promise.all(
+    files.map(async (file) => {
+      const formData = new FormData();
+      formData.append('images', file);
 
-  files.forEach((file) => {
-    formData.append('images', file);
-  });
+      try {
+        await api.post(`/product-images/product/${productId}`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          onUploadProgress: (progressEvent) => {
+            if (!progressEvent.total) return;
 
-  const res = await api.post(`/product-images/product/${productId}`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress?.(file, progress);
+          },
+        });
 
-  return res.data;
+        return {
+          success: true as const,
+          file,
+        };
+      } catch (error: any) {
+        return {
+          success: false as const,
+          file,
+          message: error?.response?.data?.message || 'Upload failed',
+        };
+      }
+    }),
+  );
+
+  return {
+    uploadedCount: results.filter((result) => result.success).length,
+    failedFiles: results
+      .filter((result) => !result.success)
+      .map((result) => ({
+        fileName: result.file.name,
+        message: result.message,
+      })),
+  };
 };
 
 export const setPrimaryProductImage = async (productId: number, imageId: number) => {

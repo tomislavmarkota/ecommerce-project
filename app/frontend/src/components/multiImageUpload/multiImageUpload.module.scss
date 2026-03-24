@@ -1,0 +1,268 @@
+.wrapper {
+  display: grid;
+  gap: 16px;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.dropzone {
+  border: 2px dashed var(--phoenix-border-dark);
+  border-radius: 16px;
+  background: #fcfdff;
+  padding: 32px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+
+  &:hover {
+    border-color: var(--phoenix-primary);
+    background: var(--phoenix-hover);
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-color: var(--phoenix-primary);
+    box-shadow: 0 0 0 3px rgba(56, 116, 255, 0.12);
+  }
+}
+
+.dragging {
+  border-color: var(--phoenix-primary);
+  background: #f5f8ff;
+  box-shadow: inset 0 0 0 2px rgba(56, 116, 255, 0.08);
+}
+
+.disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #e7efff;
+  color: var(--phoenix-primary);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.title {
+  margin: 0;
+  color: var(--phoenix-heading);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  color: var(--phoenix-text);
+}
+
+.linkLike {
+  color: var(--phoenix-primary);
+  font-weight: 700;
+}
+
+.meta {
+  margin: 10px 0 0;
+  color: var(--phoenix-text-muted);
+  font-size: 0.85rem;
+}
+
+.errorBox {
+  padding: 12px 14px;
+  border: 1px solid #f1c7cd;
+  border-radius: 12px;
+  background: #fff5f6;
+  color: #842029;
+
+  p {
+    margin: 0;
+  }
+
+  p + p {
+    margin-top: 6px;
+  }
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.selectionInfo {
+  color: var(--phoenix-text-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.toolbarActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.primaryButton,
+.secondaryButton {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.18s ease;
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+}
+
+.primaryButton {
+  border: 1px solid transparent;
+  background: var(--phoenix-primary);
+  color: #fff;
+}
+
+.secondaryButton {
+  border: 1px solid var(--phoenix-border);
+  background: #fff;
+  color: var(--phoenix-heading);
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 16px;
+}
+
+.previewCard {
+  position: relative;
+  border: 1px solid var(--phoenix-border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: var(--phoenix-shadow);
+}
+
+.removeButton {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(20, 24, 36, 0.72);
+  color: #fff;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.previewImage {
+  display: block;
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  background: #f5f7fa;
+}
+
+.previewBody {
+  padding: 12px 12px 8px;
+}
+
+.fileName {
+  margin: 0;
+  color: var(--phoenix-heading);
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fileMeta {
+  margin: 4px 0 0;
+  color: var(--phoenix-text-muted);
+  font-size: 0.8rem;
+}
+
+.progressWrap {
+  padding: 0 12px 12px;
+}
+
+.progressBar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #edf1f7;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--phoenix-primary);
+  transition: width 0.2s ease;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.progressValue {
+  color: var(--phoenix-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.uploading {
+  color: #084298;
+  background: #cfe2ff;
+}
+
+.success {
+  color: #0f5132;
+  background: #d1e7dd;
+}
+
+.error {
+  color: #842029;
+  background: #f8d7da;
+}
+
+.itemError {
+  margin: 8px 0 0;
+  color: #842029;
+  font-size: 0.78rem;
+}
