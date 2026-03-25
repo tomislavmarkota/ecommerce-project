@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
 import { fetchCatalogProducts, PublicCatalogProduct } from '../../../api/catalog';
+import ProductCard from '../../../components/productCard/ProductCard';
 import styles from './PublicProducts.module.scss';
 
 export default function PublicProducts() {
@@ -77,32 +77,7 @@ export default function PublicProducts() {
         <>
           <div className={styles.grid}>
             {products.map((product) => (
-              <Link key={product.id} to={`/products/${product.id}`} className={styles.card}>
-                <div className={styles.imageWrap}>
-                  {product.thumbnail ? (
-                    <img src={product.thumbnail} alt={product.name} className={styles.image} />
-                  ) : (
-                    <div className={styles.imagePlaceholder}>No image</div>
-                  )}
-                </div>
-
-                <div className={styles.content}>
-                  <span className={styles.category}>{product.categoryName || 'Uncategorized'}</span>
-
-                  <h3 className={styles.name}>{product.name}</h3>
-
-                  <div className={styles.priceRow}>
-                    {product.pricing.appliedDiscount ? (
-                      <>
-                        <span className={styles.oldPrice}>€{product.pricing.originalGross.toFixed(2)}</span>
-                        <span className={styles.price}>€{product.pricing.finalGross.toFixed(2)}</span>
-                      </>
-                    ) : (
-                      <span className={styles.price}>€{product.pricing.finalGross.toFixed(2)}</span>
-                    )}
-                  </div>
-                </div>
-              </Link>
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
 
