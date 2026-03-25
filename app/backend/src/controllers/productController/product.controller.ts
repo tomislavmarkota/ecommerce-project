@@ -12,7 +12,7 @@ import {
 
 const ALLOWED_SORT_FIELDS = new Set(['id', 'name', 'stock', 'created_at', 'is_published']);
 
-const isValidMoney = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+const isValidMoney = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 
 export const getProducts = async (req: Request, res: Response) => {
   try {
