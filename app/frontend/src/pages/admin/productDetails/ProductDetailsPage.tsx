@@ -4,7 +4,8 @@ import Input, { InputType } from '../../../components/input/Input';
 import ProductImagesSortableGrid from '../../../components/productImages/ProductImageSortableGrid';
 import MultiImageUpload from '../../../components/multiImageUpload/MultiImageUpload';
 import { fetchProductById, updateProduct } from '../../../api/product';
-import { fetchCategories, fetchSubcategories } from '../../../api/category';
+import { fetchCategoryTree, type CategoryTreeNode } from '../../../api/category';
+import { flattenCategoryTree, type CategoryOption } from '../../../utils/categoryTree';
 import {
   deleteProductImage,
   getProductImages,
@@ -14,27 +15,15 @@ import {
   type ProductImage,
 } from '../../../api/productImage';
 import styles from './productDetails.module.scss';
-
-type CategoryOption = {
-  id: number;
-  name: string;
-  slug: string;
-};
-
-type SubcategoryOption = {
-  id: number;
-  category_id: number;
-  name: string;
-  slug: string;
-};
+import SearchableTreeSelect from '../../../components/searchableTreeSelect/SearchableTreeSelect';
 
 type ProductFormState = {
   name: string;
   description: string;
   stock: number;
-  categoryId: number;
-  subcategoryId: string;
+  categoryId: number | '';
   isPublished: boolean;
+  images: string[];
   pricing: {
     retail: {
       priceNet: number;
@@ -54,7 +43,6 @@ type UpdateProductPayload = {
   description: string;
   stock: number;
   categoryId: number;
-  subcategoryId: number | null;
   isPublished: boolean;
   pricing: {
     retail: {
@@ -84,9 +72,9 @@ const emptyForm: ProductFormState = {
   name: '',
   description: '',
   stock: 0,
-  categoryId: 0,
-  subcategoryId: '',
+  categoryId: '',
   isPublished: false,
+  images: [],
   pricing: {
     retail: {
       priceNet: 0,
@@ -112,30 +100,14 @@ const ProductDetailsPage: React.FC = () => {
   const productId = useMemo(() => Number(id), [id]);
 
   const [form, setForm] = useState<ProductFormState>(emptyForm);
-  const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [subcategories, setSubcategories] = useState<SubcategoryOption[]>([]);
+  const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [images, setImages] = useState<ProductImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [message, setMessage] = useState('');
 
-  const loadSubcategories = async (categoryId: number): Promise<SubcategoryOption[]> => {
-    if (!Number.isInteger(categoryId) || categoryId <= 0) {
-      setSubcategories([]);
-      return [];
-    }
-
-    try {
-      const data = await fetchSubcategories(categoryId);
-      setSubcategories(data);
-      return data;
-    } catch (error) {
-      console.error(error);
-      setSubcategories([]);
-      return [];
-    }
-  };
+  const categoryOptions = useMemo<CategoryOption[]>(() => flattenCategoryTree(categoryTree), [categoryTree]);
 
   const loadProductImages = async (nextProductId: number): Promise<void> => {
     try {
@@ -150,8 +122,8 @@ const ProductDetailsPage: React.FC = () => {
   useEffect(() => {
     const loadCategories = async (): Promise<void> => {
       try {
-        const data = await fetchCategories();
-        setCategories(data);
+        const data = await fetchCategoryTree();
+        setCategoryTree(data);
       } catch (error) {
         console.error(error);
       }
@@ -174,9 +146,9 @@ const ProductDetailsPage: React.FC = () => {
           name: product.name || '',
           description: product.description || '',
           stock: product.stock || 0,
-          categoryId: product.categoryId || 0,
-          subcategoryId: product.subcategoryId ? String(product.subcategoryId) : '',
+          categoryId: product.categoryId || '',
           isPublished: Boolean(product.isPublished),
+          images: [],
           pricing: {
             retail: {
               priceNet: product.pricing?.retail?.priceNet ?? 0,
@@ -191,21 +163,6 @@ const ProductDetailsPage: React.FC = () => {
           },
         };
 
-        if (nextForm.categoryId > 0) {
-          const fetchedSubcategories = await loadSubcategories(nextForm.categoryId);
-
-          const isValidSubcategory = fetchedSubcategories.some(
-            (subcategory) => String(subcategory.id) === nextForm.subcategoryId,
-          );
-
-          if (!isValidSubcategory) {
-            nextForm.subcategoryId = '';
-          }
-        } else {
-          nextForm.subcategoryId = '';
-          setSubcategories([]);
-        }
-
         setForm(nextForm);
         await loadProductImages(productId);
       } catch (error) {
@@ -219,26 +176,21 @@ const ProductDetailsPage: React.FC = () => {
     void loadPage();
   }, [productId]);
 
-  const handleFieldChange = async (
+  const handleFieldChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
-  ): Promise<void> => {
+  ): void => {
     const { name, value, type } = e.target;
 
-    if (name === 'categoryId') {
-      const nextCategoryId = Number(value);
-
-      setForm((prev) => ({
-        ...prev,
-        categoryId: nextCategoryId,
-        subcategoryId: '',
-      }));
-
-      await loadSubcategories(nextCategoryId);
-      return;
-    }
-
     const nextValue =
-      type === 'checkbox' ? (e.target as HTMLInputElement).checked : type === 'number' ? Number(value) : value;
+      type === 'checkbox'
+        ? (e.target as HTMLInputElement).checked
+        : name === 'categoryId'
+          ? value
+            ? Number(value)
+            : ''
+          : type === 'number'
+            ? Number(value)
+            : value;
 
     setForm((prev) => ({
       ...prev,
@@ -424,13 +376,18 @@ const ProductDetailsPage: React.FC = () => {
     setSaving(true);
     setMessage('');
 
+    if (!form.categoryId) {
+      setMessage('Please select a category');
+      setSaving(false);
+      return;
+    }
+
     try {
       const payload: UpdateProductPayload = {
         name: form.name.trim(),
         description: form.description.trim(),
         stock: Number(form.stock),
         categoryId: Number(form.categoryId),
-        subcategoryId: form.subcategoryId ? Number(form.subcategoryId) : null,
         isPublished: form.isPublished,
         pricing: {
           retail: {
@@ -456,8 +413,7 @@ const ProductDetailsPage: React.FC = () => {
     }
   };
 
-  const selectedCategory = categories.find((category) => category.id === form.categoryId);
-  const selectedSubcategory = subcategories.find((subcategory) => String(subcategory.id) === form.subcategoryId);
+  const selectedCategory = categoryOptions.find((category) => category.id === form.categoryId);
 
   if (loading) {
     return <div className={styles.pageState}>Loading product...</div>;
@@ -512,12 +468,7 @@ const ProductDetailsPage: React.FC = () => {
         <div className={styles.infoRight}>
           <div className={styles.infoBlock}>
             <span className={styles.infoLabel}>Category</span>
-            <strong>{selectedCategory?.name || 'No category selected'}</strong>
-          </div>
-
-          <div className={styles.infoBlock}>
-            <span className={styles.infoLabel}>Subcategory</span>
-            <strong>{selectedSubcategory?.name || 'No subcategory selected'}</strong>
+            <strong>{selectedCategory?.label || 'No category selected'}</strong>
           </div>
 
           <div className={styles.infoBlock}>
@@ -544,49 +495,22 @@ const ProductDetailsPage: React.FC = () => {
                 </div>
               ))}
 
-              <div className={styles.field}>
-                <label htmlFor="categoryId" className={styles.label}>
-                  Category
-                </label>
-
-                <select
-                  id="categoryId"
-                  name="categoryId"
-                  value={form.categoryId || ''}
-                  onChange={handleFieldChange}
-                  className={styles.select}
-                  required
-                >
-                  <option value="">Select category</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className={styles.field}>
-                <label htmlFor="subcategoryId" className={styles.label}>
-                  Subcategory
-                </label>
-
-                <select
-                  id="subcategoryId"
-                  name="subcategoryId"
-                  value={form.subcategoryId}
-                  onChange={handleFieldChange}
-                  className={styles.select}
-                  disabled={!form.categoryId}
-                >
-                  <option value="">Select subcategory</option>
-                  {subcategories.map((subcategory) => (
-                    <option key={subcategory.id} value={subcategory.id}>
-                      {subcategory.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SearchableTreeSelect
+                id="categoryId"
+                label="Category"
+                value={form.categoryId}
+                options={categoryOptions}
+                onChange={(value) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    categoryId: value,
+                  }))
+                }
+                placeholder="Select category"
+                searchPlaceholder="Search category..."
+                emptyText="No matching categories"
+                required
+              />
             </div>
 
             <div className={styles.field}>

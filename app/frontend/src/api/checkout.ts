@@ -1,3 +1,4 @@
+// src/api/checkout.ts
 import api from './axios';
 
 export type CheckoutPreviewResponse = {
@@ -23,6 +24,13 @@ export type CheckoutPreviewResponse = {
   grandTotal: number;
 };
 
+export type GuestCheckoutCustomer = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+};
+
 export const fetchCheckoutPreview = async ({
   items,
   couponCode,
@@ -30,11 +38,7 @@ export const fetchCheckoutPreview = async ({
   items: { productId: number; quantity: number }[];
   couponCode?: string;
 }) => {
-  const res = await api.post('/checkout/preview', {
-    items,
-    couponCode,
-  });
-
+  const res = await api.post('/checkout/preview', { items, couponCode });
   return res.data as CheckoutPreviewResponse;
 };
 
@@ -45,6 +49,7 @@ export const createOrder = async ({
   shippingAddress,
   paymentMethod,
   currency = 'EUR',
+  guest,
 }: {
   items: { productId: number; quantity: number }[];
   couponCode?: string;
@@ -52,6 +57,7 @@ export const createOrder = async ({
   shippingAddress?: string;
   paymentMethod?: string;
   currency?: string;
+  guest?: GuestCheckoutCustomer;
 }) => {
   const res = await api.post('/orders', {
     items,
@@ -60,11 +66,8 @@ export const createOrder = async ({
     shippingAddress,
     paymentMethod,
     currency,
+    guest,
   });
 
-  return res.data as {
-    message: string;
-    orderId: number;
-    order: CheckoutPreviewResponse;
-  };
+  return res.data as { message: string; orderId: number; order: CheckoutPreviewResponse };
 };

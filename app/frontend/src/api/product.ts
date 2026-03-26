@@ -55,14 +55,7 @@ export type ProductDetailsResponse = {
   };
 };
 
-export type CreateProductPayload = {
-  name: string;
-  description: string;
-  stock: number;
-  categoryId: number;
-  subcategoryId: number | null;
-  images: string[];
-  isPublished: boolean;
+export type UpdateProductPricingPayload = {
   pricing: {
     retail: {
       priceNet: number;
@@ -77,21 +70,35 @@ export type CreateProductPayload = {
   };
 };
 
-export type UpdateProductPayload = CreateProductPayload;
-
-export type UpdateProductPricingPayload = {
-  pricing: {
-    retail: {
-      priceNet: number;
-      vatRate: number;
-      priceGross: number;
-    };
-    business: {
-      priceNet: number;
-      vatRate: number;
-      priceGross: number;
-    };
+export type ProductPricingPayload = {
+  retail: {
+    priceNet: number;
+    vatRate: number;
+    priceGross: number;
   };
+  business: {
+    priceNet: number;
+    vatRate: number;
+    priceGross: number;
+  };
+};
+
+export type CreateProductPayload = {
+  name: string;
+  description: string;
+  stock: number;
+  categoryId: number;
+  isPublished: boolean;
+  pricing: ProductPricingPayload;
+};
+
+export type UpdateProductPayload = {
+  name: string;
+  description: string;
+  stock: number;
+  categoryId: number;
+  isPublished: boolean;
+  pricing: ProductPricingPayload;
 };
 
 export const fetchProducts = async ({
@@ -115,13 +122,18 @@ export const fetchProducts = async ({
 };
 
 export const createProduct = async (payload: CreateProductPayload) => {
-  const res = await api.post('/products/add', payload);
-  return res.data;
+  const response = await api.post('/products', payload);
+  return response.data;
 };
 
-export const updateProduct = async (productId: number, payload: UpdateProductPayload) => {
-  const res = await api.put(`/products/${productId}`, payload);
-  return res.data;
+export const updateProduct = async (id: number, payload: UpdateProductPayload) => {
+  const response = await api.put(`/products/${id}`, payload);
+  return response.data;
+};
+
+export const fetchProductById = async (id: number) => {
+  const response = await api.get(`/products/${id}`);
+  return response.data;
 };
 
 export const updateProductPricing = async (productId: number, payload: UpdateProductPricingPayload) => {
@@ -139,9 +151,4 @@ export const deleteProducts = async (ids: number[]) => {
     deletedCount: number;
     ids: number[];
   };
-};
-
-export const fetchProductById = async (productId: number) => {
-  const res = await api.get(`/products/${productId}`);
-  return res.data as ProductDetailsResponse;
 };

@@ -1,178 +1,119 @@
 import { Request, Response } from 'express';
-import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
-import { pool } from '../config/db'; // adjust import path as needed
+import {
+  createCategory,
+  deleteCategory,
+  getCategoryById,
+  getCategoryTree,
+  moveCategory,
+  updateCategory,
+} from '../services/category.service';
 
-/**
- * Create a new category
- */
-export const createCategory = async (req: Request, res: Response): Promise<Response> => {
+export const createCategoryHandler = async (req: Request, res: Response) => {
   try {
-    const { name } = req.body;
+    const { name, parentId = null, description, imageUrl, sortOrder = 0, isActive = true } = req.body;
 
-    if (!name) {
+    if (!name || typeof name !== 'string') {
       return res.status(400).json({ message: 'Name is required' });
     }
 
-    // Check for duplicate (case-insensitive)
-    const [existingRows] = await pool.execute<RowDataPacket[]>(
-      'SELECT id FROM categories WHERE LOWER(name) = LOWER(?)',
-      [name],
-    );
-
-    if (existingRows.length > 0) {
-      return res.status(409).json({ message: 'Category name already exists' });
-    }
-
-    const [result] = await pool.execute<ResultSetHeader>('INSERT INTO categories (name) VALUES (?)', [name]);
-
-    return res.status(201).json({ id: result.insertId, name });
-  } catch (err: any) {
-    console.error(err);
-    if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ message: 'Category already exists' });
-    }
-    return res.status(500).json({ message: 'Server error' });
-  }
-};
-
-/**
- * Get all categories
- */
-export const getCategories = async (_req: Request, res: Response): Promise<Response> => {
-  try {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT id, name, slug FROM categories WHERE is_active = 1 ORDER BY name ASC',
-    );
-
-    return res.status(200).json(rows);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: 'Server error' });
-  }
-};
-
-/**
- * Get category by ID (with subcategories)
- */
-export const getCategoryById = async (req: Request, res: Response): Promise<Response> => {
-  try {
-    const { id } = req.params;
-
-    const [categoryRows] = await pool.execute<RowDataPacket[]>('SELECT id, name FROM categories WHERE id = ?', [id]);
-
-    if (categoryRows.length === 0) {
-      return res.status(404).json({ message: 'Category not found' });
-    }
-
-    const [subcategories] = await pool.execute<RowDataPacket[]>(
-      'SELECT id, name FROM subcategories WHERE category_id = ? ORDER BY name ASC',
-      [id],
-    );
-
-    return res.status(200).json({
-      ...categoryRows[0],
-      subcategories,
+    const category = await createCategory({
+      name: name.trim(),
+      parentId: parentId === null ? null : Number(parentId),
+      description,
+      imageUrl,
+      sortOrder: Number(sortOrder) || 0,
+      isActive: Boolean(isActive),
     });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: 'Server error' });
+
+    return res.status(201).json(category);
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message || 'Failed to create category' });
   }
 };
 
-/**
- * Update a category
- */
-export const updateCategory = async (req: Request, res: Response): Promise<Response> => {
+export const getCategoriesTreeHandler = async (_req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const { name } = req.body;
+    const tree = await getCategoryTree();
+    return res.status(200).json(tree);
+  } catch {
+    return res.status(500).json({ message: 'Failed to fetch category tree' });
+  }
+};
 
-    if (!name) {
+export const getCategoryByIdHandler = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const category = await getCategoryById(id);
+
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    return res.status(200).json(category);
+  } catch {
+    return res.status(500).json({ message: 'Failed to fetch category' });
+  }
+};
+
+export const updateCategoryHandler = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const { name, description, imageUrl, sortOrder = 0, isActive = true } = req.body;
+
+    if (!name || typeof name !== 'string') {
       return res.status(400).json({ message: 'Name is required' });
     }
 
-    // Check if category exists
-    const [existingCategory] = await pool.execute<RowDataPacket[]>('SELECT id FROM categories WHERE id = ?', [id]);
-    if (existingCategory.length === 0) {
+    const category = await updateCategory({
+      id,
+      name: name.trim(),
+      description,
+      imageUrl,
+      sortOrder: Number(sortOrder) || 0,
+      isActive: Boolean(isActive),
+    });
+
+    if (!category) {
       return res.status(404).json({ message: 'Category not found' });
     }
 
-    // Prevent duplicate names (case-insensitive)
-    const [duplicateRows] = await pool.execute<RowDataPacket[]>(
-      'SELECT id FROM categories WHERE LOWER(name) = LOWER(?) AND id != ?',
-      [name, id],
-    );
-    if (duplicateRows.length > 0) {
-      return res.status(409).json({ message: 'Category name already exists' });
-    }
-
-    const [result] = await pool.execute<ResultSetHeader>('UPDATE categories SET name = ? WHERE id = ?', [name, id]);
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Category not found' });
-    }
-
-    return res.status(200).json({ id, name });
-  } catch (err: any) {
-    console.error(err);
-    if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ message: 'Category already exists' });
-    }
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(200).json(category);
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message || 'Failed to update category' });
   }
 };
 
-/**
- * Delete a category
- */
-export const deleteCategory = async (req: Request, res: Response): Promise<Response> => {
+export const moveCategoryHandler = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = Number(req.params.id);
+    const { parentId = null } = req.body;
 
-    // Optional: check if category has subcategories before deletion
-    const [subcategories] = await pool.execute<RowDataPacket[]>('SELECT id FROM subcategories WHERE category_id = ?', [
+    const category = await moveCategory({
       id,
-    ]);
+      newParentId: parentId === null ? null : Number(parentId),
+    });
 
-    if (subcategories.length > 0) {
-      return res.status(400).json({
-        message: 'Cannot delete category that has subcategories',
-      });
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
     }
 
-    const [result] = await pool.execute<ResultSetHeader>('DELETE FROM categories WHERE id = ?', [id]);
+    return res.status(200).json(category);
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message || 'Failed to move category' });
+  }
+};
 
-    if (result.affectedRows === 0) {
+export const deleteCategoryHandler = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const deleted = await deleteCategory(id);
+
+    if (!deleted) {
       return res.status(404).json({ message: 'Category not found' });
     }
 
     return res.status(200).json({ message: 'Category deleted successfully' });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: 'Server error' });
-  }
-};
-export const getSubcategories = async (req: Request, res: Response): Promise<Response> => {
-  try {
-    const categoryId = Number(req.query.categoryId);
-
-    if (!Number.isInteger(categoryId) || categoryId <= 0) {
-      return res.status(400).json({ message: 'Valid categoryId is required' });
-    }
-
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      `
-        SELECT id, category_id, name, slug
-        FROM subcategories
-        WHERE category_id = ?
-        ORDER BY name ASC
-      `,
-      [categoryId],
-    );
-
-    return res.status(200).json(rows);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: 'Server error' });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message || 'Failed to delete category' });
   }
 };

@@ -1,9 +1,7 @@
 import { Request, Response } from 'express';
-//import { fetchUsers, fetchUserById } from '../services/users.service';
-
 import * as userService from '../services/users.service';
-import { AuthRequest } from '../middleware/admin.middleware';
 import { deleteUsersByIds } from '../services/users.service';
+import { AuthRequest } from '../middleware/auth.middleware';
 
 export const getUsers = async (req: Request, res: Response) => {
   try {

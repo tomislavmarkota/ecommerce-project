@@ -7,7 +7,7 @@ import {
   updateProduct,
   updateProductPricing,
 } from '../../controllers/productController/product.controller';
-import { requireAdmin } from '../../middleware/admin.middleware';
+import { requireAdmin } from '../../middleware/auth.middleware';
 
 const router = Router();
 

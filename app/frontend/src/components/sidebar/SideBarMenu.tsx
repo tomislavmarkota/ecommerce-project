@@ -29,10 +29,11 @@ type Icons = {
 const generalIcons: Icons = [
   { id: 1, component: DashboardIcon, name: 'Dashboard', route: '/dashboard' },
   { id: 2, component: StoreIcon, name: 'Products', route: '/product' },
-  { id: 3, component: OrdersIcon, name: 'Orders', route: '/orders' },
-  { id: 4, component: TransactionIcon, name: 'Transaction', route: '/transaction' },
-  { id: 5, component: CustomersIcon, name: 'Customers', route: '/users' },
-  { id: 6, component: SalesReportIcon, name: 'Sales report', route: '/sales-report' },
+  { id: 3, component: StoreIcon, name: 'Categories', route: '/categories' },
+  { id: 4, component: OrdersIcon, name: 'Orders', route: '/orders' },
+  { id: 5, component: TransactionIcon, name: 'Transaction', route: '/transaction' },
+  { id: 6, component: CustomersIcon, name: 'Customers', route: '/users' },
+  { id: 7, component: SalesReportIcon, name: 'Sales report', route: '/sales-report' },
 ];
 const toolsIcons: Icons = [
   { id: 1, component: AccountIcon, name: 'Account & Settings', route: '/account' },

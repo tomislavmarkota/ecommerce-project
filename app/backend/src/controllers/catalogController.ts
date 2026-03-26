@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
-import { AuthRequest } from '../middleware/admin.middleware';
+
 import {
   getCatalogProductWithPricing,
   getCatalogProductsList,
   getPriceListContextForUser,
 } from '../services/product-pricing.service';
+import { AuthRequest } from '../middleware/auth.middleware';
 
 export const getCatalogProducts = async (req: Request | AuthRequest, res: Response) => {
   try {

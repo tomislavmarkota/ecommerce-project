@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
-import { AuthRequest } from '../../middleware/admin.middleware';
+import { AuthRequest } from '../../middleware/auth.middleware';
 import {
   createProduct,
   deleteProductsByIds,
   getProductsList,
   updateProductPrices,
   getProductById as getProductByIdService,
-  validateSubcategoryBelongsToCategory,
+  validateCategoryExists,
   updateProductById,
 } from '../../services/product.service';
 
@@ -45,7 +45,7 @@ export const getProducts = async (req: Request, res: Response) => {
 
 export const addProduct = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, stock, categoryId, subcategoryId, isPublished, pricing } = req.body;
+    const { name, description, stock, categoryId, isPublished, pricing } = req.body;
 
     if (name == null || stock == null || categoryId == null || !pricing) {
       return res.status(400).json({
@@ -66,14 +66,6 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
     }
 
     if (
-      subcategoryId != null &&
-      subcategoryId !== '' &&
-      (!Number.isInteger(Number(subcategoryId)) || Number(subcategoryId) <= 0)
-    ) {
-      return res.status(400).json({ message: 'Valid subcategoryId is required' });
-    }
-
-    if (
       !pricing?.retail ||
       !pricing?.business ||
       !isValidMoney(pricing.retail.priceNet) ||
@@ -89,19 +81,13 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
     }
 
     const normalizedCategoryId = Number(categoryId);
-    const normalizedSubcategoryId = subcategoryId != null && subcategoryId !== '' ? Number(subcategoryId) : null;
 
-    if (normalizedSubcategoryId) {
-      const isValidSubcategory = await validateSubcategoryBelongsToCategory(
-        normalizedCategoryId,
-        normalizedSubcategoryId,
-      );
+    const categoryExists = await validateCategoryExists(normalizedCategoryId);
 
-      if (!isValidSubcategory) {
-        return res.status(400).json({
-          message: 'Selected subcategory does not belong to selected category',
-        });
-      }
+    if (!categoryExists) {
+      return res.status(400).json({
+        message: 'Selected category does not exist',
+      });
     }
 
     const result = await createProduct({
@@ -109,7 +95,6 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
       description: typeof description === 'string' ? description : '',
       stock,
       categoryId: normalizedCategoryId,
-      subcategoryId: normalizedSubcategoryId,
       isPublished: Boolean(isPublished),
       pricing: {
         retail: {
@@ -236,7 +221,7 @@ export const getProductById = async (req: Request, res: Response) => {
 export const updateProduct = async (req: AuthRequest, res: Response) => {
   try {
     const productId = Number(req.params.id);
-    const { name, description, stock, categoryId, subcategoryId, isPublished, pricing } = req.body;
+    const { name, description, stock, categoryId, isPublished, pricing } = req.body;
 
     if (!Number.isInteger(productId) || productId <= 0) {
       return res.status(400).json({ message: 'Valid product id is required' });
@@ -261,14 +246,6 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
     }
 
     if (
-      subcategoryId != null &&
-      subcategoryId !== '' &&
-      (!Number.isInteger(Number(subcategoryId)) || Number(subcategoryId) <= 0)
-    ) {
-      return res.status(400).json({ message: 'Valid subcategoryId is required' });
-    }
-
-    if (
       !pricing?.retail ||
       !pricing?.business ||
       !isValidMoney(pricing.retail.priceNet) ||
@@ -284,19 +261,13 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
     }
 
     const normalizedCategoryId = Number(categoryId);
-    const normalizedSubcategoryId = subcategoryId != null && subcategoryId !== '' ? Number(subcategoryId) : null;
 
-    if (normalizedSubcategoryId) {
-      const isValidSubcategory = await validateSubcategoryBelongsToCategory(
-        normalizedCategoryId,
-        normalizedSubcategoryId,
-      );
+    const categoryExists = await validateCategoryExists(normalizedCategoryId);
 
-      if (!isValidSubcategory) {
-        return res.status(400).json({
-          message: 'Selected subcategory does not belong to selected category',
-        });
-      }
+    if (!categoryExists) {
+      return res.status(400).json({
+        message: 'Selected category does not exist',
+      });
     }
 
     await updateProductById({
@@ -305,7 +276,6 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
       description: typeof description === 'string' ? description : '',
       stock,
       categoryId: normalizedCategoryId,
-      subcategoryId: normalizedSubcategoryId,
       isPublished: Boolean(isPublished),
       pricing: {
         retail: {

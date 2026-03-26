@@ -2,6 +2,31 @@ import { pool } from '../config/db';
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { PRICE_LIST_CODES } from '../constants/pricing';
 
+type CreateProductParams = {
+  name: string;
+  description: string;
+  stock: number;
+  categoryId: number;
+  isPublished: boolean;
+  pricing: {
+    retail: { priceNet: number; vatRate: number; priceGross: number };
+    business: { priceNet: number; vatRate: number; priceGross: number };
+  };
+};
+
+type UpdateProductParams = {
+  productId: number;
+  name: string;
+  description: string;
+  stock: number;
+  categoryId: number;
+  isPublished: boolean;
+  pricing: {
+    retail: { priceNet: number; vatRate: number; priceGross: number };
+    business: { priceNet: number; vatRate: number; priceGross: number };
+  };
+};
+
 type GetProductsListParams = {
   page: number;
   limit: number;
@@ -17,7 +42,6 @@ type ProductListRow = RowDataPacket & {
   is_published: number;
   created_at: string;
   category_name: string | null;
-  subcategory_name: string | null;
   thumbnail: string | null;
   retail_price_gross: string | null;
   business_price_gross: string | null;
@@ -32,27 +56,6 @@ type PriceListRow = RowDataPacket & {
   code: string;
 };
 
-type CreateProductParams = {
-  name: string;
-  description: string;
-  stock: number;
-  categoryId: number;
-  subcategoryId: number | null;
-  isPublished: boolean;
-  pricing: {
-    retail: {
-      priceNet: number;
-      vatRate: number;
-      priceGross: number;
-    };
-    business: {
-      priceNet: number;
-      vatRate: number;
-      priceGross: number;
-    };
-  };
-};
-
 type ProductDetailsRow = RowDataPacket & {
   id: number;
   name: string;
@@ -60,7 +63,6 @@ type ProductDetailsRow = RowDataPacket & {
   stock: number;
   is_published: number;
   category_id: number | null;
-  subcategory_id: number | null;
   created_at: string;
 };
 
@@ -89,28 +91,6 @@ type ProductImageRow = RowDataPacket & {
   updated_at: string;
 };
 
-type UpdateProductParams = {
-  productId: number;
-  name: string;
-  description: string;
-  stock: number;
-  categoryId: number;
-  subcategoryId: number | null;
-  isPublished: boolean;
-  pricing: {
-    retail: {
-      priceNet: number;
-      vatRate: number;
-      priceGross: number;
-    };
-    business: {
-      priceNet: number;
-      vatRate: number;
-      priceGross: number;
-    };
-  };
-};
-
 export const getAdminPriceListIds = async () => {
   const [rows] = await pool.query<PriceListRow[]>(
     `
@@ -134,6 +114,20 @@ export const getAdminPriceListIds = async () => {
   };
 };
 
+export const validateCategoryExists = async (categoryId: number): Promise<boolean> => {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `
+      SELECT id
+      FROM categories
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [categoryId],
+  );
+
+  return rows.length > 0;
+};
+
 export const getProductsList = async ({ page, limit, search, sortBy, sortOrder }: GetProductsListParams) => {
   const offset = (page - 1) * limit;
 
@@ -146,10 +140,9 @@ export const getProductsList = async ({ page, limit, search, sortBy, sortOrder }
         p.name LIKE ?
         OR p.description LIKE ?
         OR c.name LIKE ?
-        OR sc.name LIKE ?
       )
     `);
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
 
   const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -162,7 +155,6 @@ export const getProductsList = async ({ page, limit, search, sortBy, sortOrder }
       p.is_published,
       p.created_at,
       c.name AS category_name,
-      sc.name AS subcategory_name,
       (
         SELECT COALESCE(pi.thumbnail_url, pi.image_url)
         FROM product_images pi
@@ -173,20 +165,24 @@ export const getProductsList = async ({ page, limit, search, sortBy, sortOrder }
       (
         SELECT plp.price_gross
         FROM price_list_prices plp
+        JOIN price_lists pl ON pl.id = plp.price_list_id
         WHERE plp.product_id = p.id
-          AND plp.price_list_id = 1
+          AND pl.code = ?
         LIMIT 1
       ) AS retail_price_gross,
       (
         SELECT plp.price_gross
         FROM price_list_prices plp
+        JOIN price_lists pl ON pl.id = plp.price_list_id
         WHERE plp.product_id = p.id
-          AND plp.price_list_id = 2
+          AND pl.code = ?
         LIMIT 1
       ) AS business_price_gross
     FROM products p
-    LEFT JOIN categories c ON c.id = p.category_id
-    LEFT JOIN subcategories sc ON sc.id = p.subcategory_id
+    LEFT JOIN product_categories pc
+      ON pc.product_id = p.id AND pc.is_primary = 1
+    LEFT JOIN categories c
+      ON c.id = pc.category_id
     ${whereSql}
     ORDER BY p.${sortBy} ${sortOrder}
     LIMIT ?
@@ -196,12 +192,20 @@ export const getProductsList = async ({ page, limit, search, sortBy, sortOrder }
   const countQuery = `
     SELECT COUNT(*) AS total
     FROM products p
-    LEFT JOIN categories c ON c.id = p.category_id
-    LEFT JOIN subcategories sc ON sc.id = p.subcategory_id
+    LEFT JOIN product_categories pc
+      ON pc.product_id = p.id AND pc.is_primary = 1
+    LEFT JOIN categories c
+      ON c.id = pc.category_id
     ${whereSql}
   `;
 
-  const [rows] = await pool.query<ProductListRow[]>(dataQuery, [...params, limit, offset]);
+  const [rows] = await pool.query<ProductListRow[]>(dataQuery, [
+    PRICE_LIST_CODES.RETAIL_EUR,
+    PRICE_LIST_CODES.BUSINESS_EUR,
+    ...params,
+    limit,
+    offset,
+  ]);
   const [countRows] = await pool.query<CountRow[]>(countQuery, params);
 
   const total = countRows[0]?.total ?? 0;
@@ -220,26 +224,11 @@ export const getProductsList = async ({ page, limit, search, sortBy, sortOrder }
   };
 };
 
-export const validateSubcategoryBelongsToCategory = async (categoryId: number, subcategoryId: number) => {
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `
-      SELECT id
-      FROM subcategories
-      WHERE id = ? AND category_id = ?
-      LIMIT 1
-    `,
-    [subcategoryId, categoryId],
-  );
-
-  return rows.length > 0;
-};
-
 export const createProduct = async ({
   name,
   description,
   stock,
   categoryId,
-  subcategoryId,
   isPublished,
   pricing,
 }: CreateProductParams) => {
@@ -257,17 +246,24 @@ export const createProduct = async ({
             name,
             description,
             stock,
-            category_id,
-            subcategory_id,
             is_published,
             created_at
           )
-        VALUES (?, ?, ?, ?, ?, ?, NOW())
+        VALUES (?, ?, ?, ?, NOW())
       `,
-      [name, description, stock, categoryId, subcategoryId, isPublished],
+      [name, description, stock, isPublished],
     );
 
     const productId = result.insertId;
+
+    await connection.query(
+      `
+        INSERT INTO product_categories
+          (product_id, category_id, is_primary)
+        VALUES (?, ?, 1)
+      `,
+      [productId, categoryId],
+    );
 
     await connection.query(
       `
@@ -374,6 +370,7 @@ export const deleteProductsByIds = async (ids: number[]) => {
 
     await connection.query(`DELETE FROM product_images WHERE product_id IN (${placeholders})`, ids);
     await connection.query(`DELETE FROM price_list_prices WHERE product_id IN (${placeholders})`, ids);
+    await connection.query(`DELETE FROM product_categories WHERE product_id IN (${placeholders})`, ids);
 
     const [result] = await connection.query<ResultSetHeader>(`DELETE FROM products WHERE id IN (${placeholders})`, ids);
 
@@ -399,10 +396,11 @@ export const getProductById = async (productId: number) => {
         p.description,
         p.stock,
         p.is_published,
-        p.category_id,
-        p.subcategory_id,
-        p.created_at
+        p.created_at,
+        pc.category_id
       FROM products p
+      LEFT JOIN product_categories pc
+        ON pc.product_id = p.id AND pc.is_primary = 1
       WHERE p.id = ?
       LIMIT 1
     `,
@@ -463,7 +461,6 @@ export const getProductById = async (productId: number) => {
     description: product.description,
     stock: product.stock,
     categoryId: product.category_id,
-    subcategoryId: product.subcategory_id,
     isPublished: Boolean(product.is_published),
     createdAt: product.created_at,
     images: imageRows.map((row) => ({
@@ -508,7 +505,6 @@ export const updateProductById = async ({
   description,
   stock,
   categoryId,
-  subcategoryId,
   isPublished,
   pricing,
 }: UpdateProductParams) => {
@@ -522,16 +518,20 @@ export const updateProductById = async ({
     await connection.query(
       `
         UPDATE products
-        SET
-          name = ?,
-          description = ?,
-          stock = ?,
-          category_id = ?,
-          subcategory_id = ?,
-          is_published = ?
+        SET name = ?, description = ?, stock = ?, is_published = ?
         WHERE id = ?
       `,
-      [name, description, stock, categoryId, subcategoryId, isPublished, productId],
+      [name, description, stock, isPublished, productId],
+    );
+
+    await connection.query(`DELETE FROM product_categories WHERE product_id = ?`, [productId]);
+
+    await connection.query(
+      `
+        INSERT INTO product_categories (product_id, category_id, is_primary)
+        VALUES (?, ?, 1)
+      `,
+      [productId, categoryId],
     );
 
     await connection.query(

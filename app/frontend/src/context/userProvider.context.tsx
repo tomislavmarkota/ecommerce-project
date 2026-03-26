@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { createContext, useEffect, useState } from 'react';
 import { setAccessToken as setStoredAccessToken, clearAccessToken } from '../utils/tokenManager';
+import { refreshSession } from '../utils/refreshManager';
 
 interface User {
   email: string;
@@ -40,12 +41,10 @@ const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        const res = await axios.get(`${API_URL}/api/auth/refresh`, {
-          withCredentials: true,
-        });
+        const data = await refreshSession();
 
-        const newToken = res.data?.accessToken ?? null;
-        const userData = res.data?.user ?? null;
+        const newToken = data?.accessToken ?? null;
+        const userData = data?.user ?? null;
 
         setAccessToken(newToken);
         setUser(userData);
@@ -60,6 +59,7 @@ const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     restoreSession();
   }, []);
 
+  console.log('USER', user);
   const logout = async () => {
     try {
       await axios.post(`${API_URL}/api/auth/logout`, {}, { withCredentials: true });

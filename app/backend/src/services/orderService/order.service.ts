@@ -1,15 +1,21 @@
 import { pool } from '../../config/db';
-import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { RowDataPacket } from 'mysql2/promise';
 import { buildCheckoutPreview } from '../checkoutService/checkout.service';
 
 type CreateOrderParams = {
-  userId: number;
+  userId: number | null;
   items: { productId: number; quantity: number }[];
   couponCode?: string;
   billingAddress?: string | null;
   shippingAddress?: string | null;
   paymentMethod?: string | null;
   currency?: string;
+  guest?: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone?: string | null;
+  } | null;
 };
 
 type GetOrdersListParams = {
@@ -37,114 +43,6 @@ type OrderListRow = RowDataPacket & {
 
 type CountRow = RowDataPacket & {
   total: number;
-};
-
-export const createOrderFromCheckout = async ({
-  userId,
-  items,
-  couponCode,
-  billingAddress = null,
-  shippingAddress = null,
-  paymentMethod = null,
-  currency = 'EUR',
-}: CreateOrderParams) => {
-  const connection = await pool.getConnection();
-
-  try {
-    await connection.beginTransaction();
-
-    const preview = await buildCheckoutPreview({
-      items,
-      userId,
-      couponCode,
-    });
-
-    const [orderResult] = await connection.query<ResultSetHeader>(
-      `
-        INSERT INTO orders
-          (
-            user_id,
-            coupon_id,
-            coupon_code,
-            customer_group_code,
-            currency,
-            status,
-            billing_address,
-            shipping_address,
-            payment_method,
-            subtotal,
-            discount_total,
-            shipping_total,
-            tax_total,
-            grand_total,
-            created_at,
-            updated_at
-          )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      `,
-      [
-        userId,
-        preview.coupon?.id ?? null,
-        preview.coupon?.code ?? null,
-        preview.customerGroupCode,
-        currency,
-        'pending',
-        billingAddress,
-        shippingAddress,
-        paymentMethod,
-        preview.subtotal,
-        (preview.coupon?.discountAmount ?? 0) + preview.items.reduce((sum, item) => sum + item.discount_amount, 0),
-        0,
-        0,
-        preview.grandTotal,
-      ],
-    );
-
-    const orderId = orderResult.insertId;
-
-    for (const item of preview.items) {
-      await connection.query(
-        `
-          INSERT INTO order_items
-            (
-              order_id,
-              product_id,
-              quantity,
-              original_unit_price,
-              unit_price,
-              discount_amount,
-              total_price,
-              applied_discount_id,
-              applied_discount_name
-            )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        [
-          orderId,
-          item.productId,
-          item.quantity,
-          item.original_unit_price,
-          item.unit_price,
-          item.discount_amount,
-          item.total_price,
-          item.applied_discount_id,
-          item.applied_discount_name,
-        ],
-      );
-    }
-
-    await connection.commit();
-
-    return {
-      orderId,
-      preview,
-    };
-  } catch (err) {
-    await connection.rollback();
-    throw err;
-  } finally {
-    connection.release();
-  }
 };
 
 export const getOrdersList = async ({ page, limit, search, sortBy, sortOrder }: GetOrdersListParams) => {
@@ -235,4 +133,116 @@ export const getOrdersList = async ({ page, limit, search, sortBy, sortOrder }: 
     limit,
     totalPages: Math.ceil(total / limit),
   };
+};
+
+export const createOrderFromCheckout = async ({
+  userId,
+  items,
+  couponCode,
+  billingAddress = null,
+  shippingAddress = null,
+  paymentMethod = null,
+  currency = 'EUR',
+  guest = null,
+}: CreateOrderParams) => {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const preview = await buildCheckoutPreview({
+      items,
+      userId,
+      couponCode,
+    });
+
+    const [orderResult]: any = await connection.query(
+      `
+      INSERT INTO orders (
+        user_id,
+        guest_email,
+        guest_first_name,
+        guest_last_name,
+        guest_phone,
+        coupon_id,
+        coupon_code,
+        customer_group_code,
+        currency,
+        status,
+        billing_address,
+        shipping_address,
+        payment_method,
+        subtotal,
+        discount_total,
+        shipping_total,
+        tax_total,
+        grand_total,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      `,
+      [
+        userId,
+        guest?.email ?? null,
+        guest?.firstName ?? null,
+        guest?.lastName ?? null,
+        guest?.phone ?? null,
+        preview.coupon?.id ?? null,
+        preview.coupon?.code ?? null,
+        preview.customerGroupCode,
+        currency,
+        'pending',
+        billingAddress,
+        shippingAddress,
+        paymentMethod,
+        preview.subtotal,
+        (preview.coupon?.discountAmount ?? 0) + preview.items.reduce((sum, item) => sum + item.discount_amount, 0),
+        0,
+        0,
+        preview.grandTotal,
+      ],
+    );
+
+    const orderId = orderResult.insertId;
+
+    for (const item of preview.items) {
+      await connection.query(
+        `
+        INSERT INTO order_items (
+          order_id,
+          product_id,
+          quantity,
+          original_unit_price,
+          unit_price,
+          discount_amount,
+          total_price,
+          applied_discount_id,
+          applied_discount_name
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          orderId,
+          item.productId,
+          item.quantity,
+          item.original_unit_price,
+          item.unit_price,
+          item.discount_amount,
+          item.total_price,
+          item.applied_discount_id,
+          item.applied_discount_name,
+        ],
+      );
+    }
+
+    await connection.commit();
+
+    return { orderId, preview };
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 };

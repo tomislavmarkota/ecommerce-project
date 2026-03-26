@@ -7,6 +7,7 @@ import ProtectedRoute from './routes/protectedRoute';
 import Login from './pages/admin/login/Login';
 import AppContainer from './pages/appContainer/AppContainer';
 import PublicLayout from './pages/public/publicLayout/publicLayout';
+import Categories from './pages/admin/categories/Categories';
 
 const Home = lazy(() => import('./pages/public/products/PublicProducts'));
 const PublicProducts = lazy(() => import('./pages/public/products/PublicProducts'));
@@ -57,6 +58,7 @@ function App() {
                       <Route path=":id" element={<ProductDetailsPage />} />
                     </Route>
 
+                    <Route path="/categories" element={<Categories />} />
                     <Route path="/transaction" element={<Transaction />} />
                     <Route path="/orders" element={<OrdersPage />} />
                     <Route path="/users" element={<Customers />} />
