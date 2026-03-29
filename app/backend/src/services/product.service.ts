@@ -1,17 +1,15 @@
 import { pool } from '../config/db';
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
-import { PRICE_LIST_CODES } from '../constants/pricing';
+import { ProductPricingInput } from '../../types/pricing';
 
 type CreateProductParams = {
   name: string;
   description: string;
   stock: number;
-  categoryId: number;
+  categoryIds: number[];
+  primaryCategoryId: number;
   isPublished: boolean;
-  pricing: {
-    retail: { priceNet: number; vatRate: number; priceGross: number };
-    business: { priceNet: number; vatRate: number; priceGross: number };
-  };
+  pricing: ProductPricingInput;
 };
 
 type UpdateProductParams = {
@@ -19,12 +17,10 @@ type UpdateProductParams = {
   name: string;
   description: string;
   stock: number;
-  categoryId: number;
+  categoryIds: number[];
+  primaryCategoryId: number;
   isPublished: boolean;
-  pricing: {
-    retail: { priceNet: number; vatRate: number; priceGross: number };
-    business: { priceNet: number; vatRate: number; priceGross: number };
-  };
+  pricing: ProductPricingInput;
 };
 
 type GetProductsListParams = {
@@ -41,19 +37,15 @@ type ProductListRow = RowDataPacket & {
   stock: number;
   is_published: number;
   created_at: string;
+  price_net: string;
+  vat_rate: string;
+  price_gross: string;
   category_name: string | null;
   thumbnail: string | null;
-  retail_price_gross: string | null;
-  business_price_gross: string | null;
 };
 
 type CountRow = RowDataPacket & {
   total: number;
-};
-
-type PriceListRow = RowDataPacket & {
-  id: number;
-  code: string;
 };
 
 type ProductDetailsRow = RowDataPacket & {
@@ -62,15 +54,17 @@ type ProductDetailsRow = RowDataPacket & {
   description: string | null;
   stock: number;
   is_published: number;
-  category_id: number | null;
   created_at: string;
-};
-
-type ProductPriceRow = RowDataPacket & {
-  code: string;
+  updated_at: string | null;
   price_net: string;
   vat_rate: string;
   price_gross: string;
+};
+
+type ProductCategoryRow = RowDataPacket & {
+  category_id: number;
+  category_name: string | null;
+  is_primary: number;
 };
 
 type ProductImageRow = RowDataPacket & {
@@ -91,27 +85,25 @@ type ProductImageRow = RowDataPacket & {
   updated_at: string;
 };
 
-export const getAdminPriceListIds = async () => {
-  const [rows] = await pool.query<PriceListRow[]>(
-    `
-      SELECT id, code
-      FROM price_lists
-      WHERE code IN (?, ?)
-    `,
-    [PRICE_LIST_CODES.RETAIL_EUR, PRICE_LIST_CODES.BUSINESS_EUR],
-  );
+const normalizeCategoryIds = (categoryIds: number[]): number[] => [
+  ...new Set(categoryIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)),
+];
 
-  const retail = rows.find((row) => row.code === PRICE_LIST_CODES.RETAIL_EUR);
-  const business = rows.find((row) => row.code === PRICE_LIST_CODES.BUSINESS_EUR);
-
-  if (!retail || !business) {
-    throw new Error('Required price lists are not configured');
+const insertProductCategories = async (
+  connection: Awaited<ReturnType<typeof pool.getConnection>>,
+  productId: number,
+  categoryIds: number[],
+  primaryCategoryId: number,
+) => {
+  for (const categoryId of categoryIds) {
+    await connection.query(
+      `
+        INSERT INTO product_categories (product_id, category_id, is_primary)
+        VALUES (?, ?, ?)
+      `,
+      [productId, categoryId, categoryId === primaryCategoryId ? 1 : 0],
+    );
   }
-
-  return {
-    retailPriceListId: retail.id,
-    businessPriceListId: business.id,
-  };
 };
 
 export const validateCategoryExists = async (categoryId: number): Promise<boolean> => {
@@ -128,6 +120,27 @@ export const validateCategoryExists = async (categoryId: number): Promise<boolea
   return rows.length > 0;
 };
 
+export const validateCategoriesExist = async (categoryIds: number[]): Promise<boolean> => {
+  const normalizedIds = normalizeCategoryIds(categoryIds);
+
+  if (normalizedIds.length === 0) {
+    return false;
+  }
+
+  const placeholders = normalizedIds.map(() => '?').join(', ');
+
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `
+      SELECT id
+      FROM categories
+      WHERE id IN (${placeholders})
+    `,
+    normalizedIds,
+  );
+
+  return rows.length === normalizedIds.length;
+};
+
 export const getProductsList = async ({ page, limit, search, sortBy, sortOrder }: GetProductsListParams) => {
   const offset = (page - 1) * limit;
 
@@ -135,13 +148,7 @@ export const getProductsList = async ({ page, limit, search, sortBy, sortOrder }
   const params: Array<string | number> = [];
 
   if (search) {
-    whereClauses.push(`
-      (
-        p.name LIKE ?
-        OR p.description LIKE ?
-        OR c.name LIKE ?
-      )
-    `);
+    whereClauses.push(`(p.name LIKE ? OR p.description LIKE ? OR c.name LIKE ?)`);
     params.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
 
@@ -154,6 +161,9 @@ export const getProductsList = async ({ page, limit, search, sortBy, sortOrder }
       p.stock,
       p.is_published,
       p.created_at,
+      p.price_net,
+      p.vat_rate,
+      p.price_gross,
       c.name AS category_name,
       (
         SELECT COALESCE(pi.thumbnail_url, pi.image_url)
@@ -161,61 +171,46 @@ export const getProductsList = async ({ page, limit, search, sortBy, sortOrder }
         WHERE pi.product_id = p.id
         ORDER BY pi.is_primary DESC, pi.sort_order ASC, pi.id ASC
         LIMIT 1
-      ) AS thumbnail,
-      (
-        SELECT plp.price_gross
-        FROM price_list_prices plp
-        JOIN price_lists pl ON pl.id = plp.price_list_id
-        WHERE plp.product_id = p.id
-          AND pl.code = ?
-        LIMIT 1
-      ) AS retail_price_gross,
-      (
-        SELECT plp.price_gross
-        FROM price_list_prices plp
-        JOIN price_lists pl ON pl.id = plp.price_list_id
-        WHERE plp.product_id = p.id
-          AND pl.code = ?
-        LIMIT 1
-      ) AS business_price_gross
+      ) AS thumbnail
     FROM products p
     LEFT JOIN product_categories pc
-      ON pc.product_id = p.id AND pc.is_primary = 1
+      ON pc.product_id = p.id
+     AND pc.is_primary = 1
     LEFT JOIN categories c
       ON c.id = pc.category_id
     ${whereSql}
     ORDER BY p.${sortBy} ${sortOrder}
-    LIMIT ?
-    OFFSET ?
+    LIMIT ? OFFSET ?
   `;
 
   const countQuery = `
-    SELECT COUNT(*) AS total
+    SELECT COUNT(DISTINCT p.id) AS total
     FROM products p
     LEFT JOIN product_categories pc
-      ON pc.product_id = p.id AND pc.is_primary = 1
+      ON pc.product_id = p.id
+     AND pc.is_primary = 1
     LEFT JOIN categories c
       ON c.id = pc.category_id
     ${whereSql}
   `;
 
-  const [rows] = await pool.query<ProductListRow[]>(dataQuery, [
-    PRICE_LIST_CODES.RETAIL_EUR,
-    PRICE_LIST_CODES.BUSINESS_EUR,
-    ...params,
-    limit,
-    offset,
-  ]);
+  const [rows] = await pool.query<ProductListRow[]>(dataQuery, [...params, limit, offset]);
   const [countRows] = await pool.query<CountRow[]>(countQuery, params);
 
   const total = countRows[0]?.total ?? 0;
 
   return {
     data: rows.map((row) => ({
-      ...row,
+      id: row.id,
+      name: row.name,
+      stock: row.stock,
       is_published: Boolean(row.is_published),
-      retail_price_gross: row.retail_price_gross != null ? Number(row.retail_price_gross) : null,
-      business_price_gross: row.business_price_gross != null ? Number(row.business_price_gross) : null,
+      created_at: row.created_at,
+      price_net: Number(row.price_net),
+      vat_rate: Number(row.vat_rate),
+      price_gross: Number(row.price_gross),
+      category_name: row.category_name,
+      thumbnail: row.thumbnail,
     })),
     total,
     page,
@@ -228,71 +223,46 @@ export const createProduct = async ({
   name,
   description,
   stock,
-  categoryId,
+  categoryIds,
+  primaryCategoryId,
   isPublished,
   pricing,
 }: CreateProductParams) => {
+  const normalizedCategoryIds = normalizeCategoryIds(categoryIds);
+
   const connection = await pool.getConnection();
 
   try {
-    const { retailPriceListId, businessPriceListId } = await getAdminPriceListIds();
-
     await connection.beginTransaction();
 
     const [result] = await connection.query<ResultSetHeader>(
       `
-        INSERT INTO products
-          (
-            name,
-            description,
-            stock,
-            is_published,
-            created_at
-          )
-        VALUES (?, ?, ?, ?, NOW())
+        INSERT INTO products (
+          name,
+          description,
+          stock,
+          is_published,
+          price_net,
+          vat_rate,
+          price_gross,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `,
-      [name, description, stock, isPublished],
+      [name, description, stock, isPublished ? 1 : 0, pricing.priceNet, pricing.vatRate, pricing.priceGross],
     );
 
     const productId = result.insertId;
 
-    await connection.query(
-      `
-        INSERT INTO product_categories
-          (product_id, category_id, is_primary)
-        VALUES (?, ?, 1)
-      `,
-      [productId, categoryId],
-    );
-
-    await connection.query(
-      `
-        INSERT INTO price_list_prices
-          (price_list_id, product_id, price_net, vat_rate, price_gross)
-        VALUES
-          (?, ?, ?, ?, ?),
-          (?, ?, ?, ?, ?)
-      `,
-      [
-        retailPriceListId,
-        productId,
-        pricing.retail.priceNet,
-        pricing.retail.vatRate,
-        pricing.retail.priceGross,
-        businessPriceListId,
-        productId,
-        pricing.business.priceNet,
-        pricing.business.vatRate,
-        pricing.business.priceGross,
-      ],
-    );
+    await insertProductCategories(connection, productId, normalizedCategoryIds, primaryCategoryId);
 
     await connection.commit();
 
     return { productId };
-  } catch (err) {
+  } catch (error) {
     await connection.rollback();
-    throw err;
+    throw error;
   } finally {
     connection.release();
   }
@@ -303,62 +273,24 @@ export const updateProductPrices = async ({
   pricing,
 }: {
   productId: number;
-  pricing: {
-    retail: {
-      priceNet: number;
-      vatRate: number;
-      priceGross: number;
-    };
-    business: {
-      priceNet: number;
-      vatRate: number;
-      priceGross: number;
-    };
-  };
+  pricing: ProductPricingInput;
 }) => {
-  const connection = await pool.getConnection();
+  const [result] = await pool.query<ResultSetHeader>(
+    `
+      UPDATE products
+      SET
+        price_net = ?,
+        vat_rate = ?,
+        price_gross = ?,
+        updated_at = NOW()
+      WHERE id = ?
+    `,
+    [pricing.priceNet, pricing.vatRate, pricing.priceGross, productId],
+  );
 
-  try {
-    const { retailPriceListId, businessPriceListId } = await getAdminPriceListIds();
-
-    await connection.beginTransaction();
-
-    await connection.query(
-      `
-        INSERT INTO price_list_prices
-          (price_list_id, product_id, price_net, vat_rate, price_gross)
-        VALUES
-          (?, ?, ?, ?, ?),
-          (?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          price_net = VALUES(price_net),
-          vat_rate = VALUES(vat_rate),
-          price_gross = VALUES(price_gross),
-          updated_at = CURRENT_TIMESTAMP
-      `,
-      [
-        retailPriceListId,
-        productId,
-        pricing.retail.priceNet,
-        pricing.retail.vatRate,
-        pricing.retail.priceGross,
-        businessPriceListId,
-        productId,
-        pricing.business.priceNet,
-        pricing.business.vatRate,
-        pricing.business.priceGross,
-      ],
-    );
-
-    await connection.commit();
-
-    return { updated: true };
-  } catch (err) {
-    await connection.rollback();
-    throw err;
-  } finally {
-    connection.release();
-  }
+  return {
+    updated: result.affectedRows > 0,
+  };
 };
 
 export const deleteProductsByIds = async (ids: number[]) => {
@@ -368,8 +300,10 @@ export const deleteProductsByIds = async (ids: number[]) => {
   try {
     await connection.beginTransaction();
 
+    await connection.query(`DELETE FROM company_product_discounts WHERE product_id IN (${placeholders})`, ids);
+
     await connection.query(`DELETE FROM product_images WHERE product_id IN (${placeholders})`, ids);
-    await connection.query(`DELETE FROM price_list_prices WHERE product_id IN (${placeholders})`, ids);
+
     await connection.query(`DELETE FROM product_categories WHERE product_id IN (${placeholders})`, ids);
 
     const [result] = await connection.query<ResultSetHeader>(`DELETE FROM products WHERE id IN (${placeholders})`, ids);
@@ -379,9 +313,9 @@ export const deleteProductsByIds = async (ids: number[]) => {
     return {
       deletedCount: result.affectedRows,
     };
-  } catch (err) {
+  } catch (error) {
     await connection.rollback();
-    throw err;
+    throw error;
   } finally {
     connection.release();
   }
@@ -397,10 +331,11 @@ export const getProductById = async (productId: number) => {
         p.stock,
         p.is_published,
         p.created_at,
-        pc.category_id
+        p.updated_at,
+        p.price_net,
+        p.vat_rate,
+        p.price_gross
       FROM products p
-      LEFT JOIN product_categories pc
-        ON pc.product_id = p.id AND pc.is_primary = 1
       WHERE p.id = ?
       LIMIT 1
     `,
@@ -413,16 +348,17 @@ export const getProductById = async (productId: number) => {
     return null;
   }
 
-  const [priceRows] = await pool.query<ProductPriceRow[]>(
+  const [categoryRows] = await pool.query<ProductCategoryRow[]>(
     `
       SELECT
-        pl.code,
-        plp.price_net,
-        plp.vat_rate,
-        plp.price_gross
-      FROM price_list_prices plp
-      JOIN price_lists pl ON pl.id = plp.price_list_id
-      WHERE plp.product_id = ?
+        pc.category_id,
+        c.name AS category_name,
+        pc.is_primary
+      FROM product_categories pc
+      LEFT JOIN categories c
+        ON c.id = pc.category_id
+      WHERE pc.product_id = ?
+      ORDER BY pc.is_primary DESC, c.name ASC
     `,
     [productId],
   );
@@ -452,17 +388,24 @@ export const getProductById = async (productId: number) => {
     [productId],
   );
 
-  const retail = priceRows.find((row) => row.code === PRICE_LIST_CODES.RETAIL_EUR);
-  const business = priceRows.find((row) => row.code === PRICE_LIST_CODES.BUSINESS_EUR);
+  const primaryCategory = categoryRows.find((row) => Boolean(row.is_primary)) ?? categoryRows[0] ?? null;
 
   return {
     id: product.id,
     name: product.name,
     description: product.description,
     stock: product.stock,
-    categoryId: product.category_id,
+    categoryId: primaryCategory?.category_id ?? null,
+    categoryIds: categoryRows.map((row) => row.category_id),
+    primaryCategoryId: primaryCategory?.category_id ?? null,
+    categories: categoryRows.map((row) => ({
+      categoryId: row.category_id,
+      categoryName: row.category_name,
+      isPrimary: Boolean(row.is_primary),
+    })),
     isPublished: Boolean(product.is_published),
     createdAt: product.created_at,
+    updatedAt: product.updated_at,
     images: imageRows.map((row) => ({
       id: row.id,
       product_id: row.product_id,
@@ -481,20 +424,9 @@ export const getProductById = async (productId: number) => {
       updated_at: row.updated_at,
     })),
     pricing: {
-      retail: retail
-        ? {
-            priceNet: Number(retail.price_net),
-            vatRate: Number(retail.vat_rate),
-            priceGross: Number(retail.price_gross),
-          }
-        : null,
-      business: business
-        ? {
-            priceNet: Number(business.price_net),
-            vatRate: Number(business.vat_rate),
-            priceGross: Number(business.price_gross),
-          }
-        : null,
+      priceNet: Number(product.price_net),
+      vatRate: Number(product.vat_rate),
+      priceGross: Number(product.price_gross),
     },
   };
 };
@@ -504,69 +436,45 @@ export const updateProductById = async ({
   name,
   description,
   stock,
-  categoryId,
+  categoryIds,
+  primaryCategoryId,
   isPublished,
   pricing,
 }: UpdateProductParams) => {
+  const normalizedCategoryIds = normalizeCategoryIds(categoryIds);
+
   const connection = await pool.getConnection();
 
   try {
-    const { retailPriceListId, businessPriceListId } = await getAdminPriceListIds();
-
     await connection.beginTransaction();
 
     await connection.query(
       `
         UPDATE products
-        SET name = ?, description = ?, stock = ?, is_published = ?
+        SET
+          name = ?,
+          description = ?,
+          stock = ?,
+          is_published = ?,
+          price_net = ?,
+          vat_rate = ?,
+          price_gross = ?,
+          updated_at = NOW()
         WHERE id = ?
       `,
-      [name, description, stock, isPublished, productId],
+      [name, description, stock, isPublished ? 1 : 0, pricing.priceNet, pricing.vatRate, pricing.priceGross, productId],
     );
 
     await connection.query(`DELETE FROM product_categories WHERE product_id = ?`, [productId]);
 
-    await connection.query(
-      `
-        INSERT INTO product_categories (product_id, category_id, is_primary)
-        VALUES (?, ?, 1)
-      `,
-      [productId, categoryId],
-    );
-
-    await connection.query(
-      `
-        INSERT INTO price_list_prices
-          (price_list_id, product_id, price_net, vat_rate, price_gross)
-        VALUES
-          (?, ?, ?, ?, ?),
-          (?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          price_net = VALUES(price_net),
-          vat_rate = VALUES(vat_rate),
-          price_gross = VALUES(price_gross),
-          updated_at = CURRENT_TIMESTAMP
-      `,
-      [
-        retailPriceListId,
-        productId,
-        pricing.retail.priceNet,
-        pricing.retail.vatRate,
-        pricing.retail.priceGross,
-        businessPriceListId,
-        productId,
-        pricing.business.priceNet,
-        pricing.business.vatRate,
-        pricing.business.priceGross,
-      ],
-    );
+    await insertProductCategories(connection, productId, normalizedCategoryIds, primaryCategoryId);
 
     await connection.commit();
 
     return { updated: true };
-  } catch (err) {
+  } catch (error) {
     await connection.rollback();
-    throw err;
+    throw error;
   } finally {
     connection.release();
   }

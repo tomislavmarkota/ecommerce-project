@@ -1,23 +1,37 @@
 import api from './axios';
 
+export type PublicCatalogProduct = {
+  id: number;
+  name: string;
+  description: string | null;
+  stock: number;
+  isPublished: boolean;
+  categoryId: number | null;
+  categoryName: string | null;
+  thumbnail: string | null;
+  pricing: {
+    productId: number;
+    currency: string;
+    originalNet: number;
+    originalGross: number;
+    vatRate: number;
+    discountPercent: number;
+    discountAmountNet: number;
+    discountAmountGross: number;
+    finalNet: number;
+    finalGross: number;
+    source: string;
+    companyId: number | null;
+    customerType: 'b2c' | 'b2b';
+  };
+};
+
 export type CatalogProductsResponse = {
   data: PublicCatalogProduct[];
   total: number;
   page: number;
   limit: number;
   totalPages: number;
-};
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
-export type PublicCatalogProduct = {
-  id: number;
-  name: string;
-  description: string | null;
-  stock: number;
-  thumbnail: string | null;
-  retail_price_gross: number | null;
-  business_price_gross: number | null;
 };
 
 export type FetchCatalogProductsParams = {
@@ -33,7 +47,7 @@ export const fetchCatalogProducts = async ({
   search = '',
   categoryId = null,
 }: FetchCatalogProductsParams) => {
-  const response = await api.get('/catalog/products', {
+  const response = await api.get<CatalogProductsResponse>('/catalog/products', {
     params: {
       page,
       limit,
@@ -46,6 +60,6 @@ export const fetchCatalogProducts = async ({
 };
 
 export const fetchCatalogProduct = async (productId: number) => {
-  const res = await api.get(`${API_BASE}/api/catalog/products/${productId}`);
-  return res.data as PublicCatalogProduct;
+  const res = await api.get<PublicCatalogProduct>(`/catalog/products/${productId}`);
+  return res.data;
 };

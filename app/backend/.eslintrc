@@ -14,26 +14,14 @@
       "error",
       {
         "selector": "default",
-        "format": ["camelCase"],
         "leadingUnderscore": "allow",
         "trailingUnderscore": "allow",
       },
-
-      {
-        "selector": "import",
-        "format": ["camelCase", "PascalCase"],
-      },
-
       {
         "selector": "variable",
         "format": ["camelCase", "UPPER_CASE"],
         "leadingUnderscore": "allow",
         "trailingUnderscore": "allow",
-      },
-
-      {
-        "selector": "typeLike",
-        "format": ["PascalCase"],
       },
     ],
   },

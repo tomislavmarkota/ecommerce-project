@@ -5,7 +5,7 @@ export type LabelProps = {
   labelProps?: React.LabelHTMLAttributes<HTMLLabelElement>;
 };
 
-export type InputType = {
+export type InputTypeProps = {
   inputProps: React.InputHTMLAttributes<HTMLInputElement>;
   label?: LabelProps;
   iconComponent?: React.FunctionComponent<
@@ -18,7 +18,13 @@ export type InputType = {
   >;
 };
 
-function Input(props: InputType) {
+export enum InputType {
+  TEXT = 'text',
+  NUMBER = 'number',
+  PASSWORD = 'password',
+}
+
+function Input(props: InputTypeProps) {
   return (
     <div className={inputStyle.inputContainer}>
       {props.label && (

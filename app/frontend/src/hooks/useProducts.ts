@@ -3,17 +3,24 @@ import { PaginationState, SortingState } from '@tanstack/react-table';
 import { fetchProducts } from '../api/product';
 
 export const useProducts = (pagination: PaginationState, globalFilter: string, sorting: SortingState) => {
+  const sort = sorting[0];
+
   return useQuery({
-    queryKey: ['products', pagination.pageIndex, pagination.pageSize, globalFilter, sorting],
+    queryKey: [
+      'products',
+      pagination.pageIndex,
+      pagination.pageSize,
+      globalFilter,
+      sort?.id ?? 'created_at',
+      sort?.desc ?? true,
+    ],
     queryFn: () =>
       fetchProducts({
-        pageIndex: pagination.pageIndex,
-        pageSize: pagination.pageSize,
-        globalFilter,
-        sorting: sorting.map((item) => ({
-          id: item.id,
-          desc: item.desc,
-        })),
+        page: pagination.pageIndex + 1,
+        limit: pagination.pageSize,
+        search: globalFilter.trim() || undefined,
+        sortBy: sort?.id ?? 'created_at',
+        sortOrder: sort?.desc ? 'DESC' : 'ASC',
       }),
     placeholderData: (previousData) => previousData,
   });

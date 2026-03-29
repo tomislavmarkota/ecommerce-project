@@ -4,15 +4,43 @@ import {
   createProduct,
   deleteProductsByIds,
   getProductsList,
-  updateProductPrices,
   getProductById as getProductByIdService,
-  validateCategoryExists,
   updateProductById,
+  updateProductPrices,
+  validateCategoriesExist,
 } from '../../services/product.service';
 
-const ALLOWED_SORT_FIELDS = new Set(['id', 'name', 'stock', 'created_at', 'is_published']);
+const ALLOWED_SORT_FIELDS = new Set(['id', 'name', 'stock', 'created_at', 'is_published', 'price_gross']);
 
 const isValidMoney = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+
+const hasValidPricing = (
+  pricing: unknown,
+): pricing is {
+  priceNet: number;
+  vatRate: number;
+  priceGross: number;
+} => {
+  if (!pricing || typeof pricing !== 'object') {
+    return false;
+  }
+
+  const candidate = pricing as {
+    priceNet?: unknown;
+    vatRate?: unknown;
+    priceGross?: unknown;
+  };
+
+  return isValidMoney(candidate.priceNet) && isValidMoney(candidate.vatRate) && isValidMoney(candidate.priceGross);
+};
+
+const normalizeCategoryIds = (categoryIds: unknown): number[] => {
+  if (!Array.isArray(categoryIds)) {
+    return [];
+  }
+
+  return [...new Set(categoryIds)].map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+};
 
 export const getProducts = async (req: Request, res: Response) => {
   try {
@@ -26,6 +54,7 @@ export const getProducts = async (req: Request, res: Response) => {
     const sortBy = ALLOWED_SORT_FIELDS.has(rawSortBy) ? rawSortBy : 'created_at';
 
     const rawSortOrder = typeof req.query.sortOrder === 'string' ? req.query.sortOrder.toUpperCase() : 'DESC';
+
     const sortOrder = rawSortOrder === 'ASC' ? 'ASC' : 'DESC';
 
     const result = await getProductsList({
@@ -37,19 +66,19 @@ export const getProducts = async (req: Request, res: Response) => {
     });
 
     return res.status(200).json(result);
-  } catch (err) {
-    console.error('Fetch products error:', err);
+  } catch (error) {
+    console.error('Fetch products error:', error);
     return res.status(500).json({ message: 'Failed to fetch products' });
   }
 };
 
 export const addProduct = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, stock, categoryId, isPublished, pricing } = req.body;
+    const { name, description, stock, categoryIds, primaryCategoryId, isPublished, pricing } = req.body;
 
-    if (name == null || stock == null || categoryId == null || !pricing) {
+    if (name == null || stock == null || categoryIds == null || primaryCategoryId == null || !pricing) {
       return res.status(400).json({
-        message: 'Name, stock, categoryId and pricing are required',
+        message: 'Name, stock, categoryIds, primaryCategoryId and pricing are required',
       });
     }
 
@@ -61,32 +90,38 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Valid stock is required' });
     }
 
-    if (!Number.isInteger(Number(categoryId)) || Number(categoryId) <= 0) {
-      return res.status(400).json({ message: 'Valid categoryId is required' });
-    }
+    const normalizedCategoryIds = normalizeCategoryIds(categoryIds);
+    const normalizedPrimaryCategoryId = Number(primaryCategoryId);
 
-    if (
-      !pricing?.retail ||
-      !pricing?.business ||
-      !isValidMoney(pricing.retail.priceNet) ||
-      !isValidMoney(pricing.retail.priceGross) ||
-      !isValidMoney(pricing.retail.vatRate) ||
-      !isValidMoney(pricing.business.priceNet) ||
-      !isValidMoney(pricing.business.priceGross) ||
-      !isValidMoney(pricing.business.vatRate)
-    ) {
+    if (normalizedCategoryIds.length === 0) {
       return res.status(400).json({
-        message: 'Valid retail and business pricing is required',
+        message: 'At least one valid category is required',
       });
     }
 
-    const normalizedCategoryId = Number(categoryId);
-
-    const categoryExists = await validateCategoryExists(normalizedCategoryId);
-
-    if (!categoryExists) {
+    if (!Number.isInteger(normalizedPrimaryCategoryId) || normalizedPrimaryCategoryId <= 0) {
       return res.status(400).json({
-        message: 'Selected category does not exist',
+        message: 'Valid primaryCategoryId is required',
+      });
+    }
+
+    if (!normalizedCategoryIds.includes(normalizedPrimaryCategoryId)) {
+      return res.status(400).json({
+        message: 'Primary category must be included in categoryIds',
+      });
+    }
+
+    if (!hasValidPricing(pricing)) {
+      return res.status(400).json({
+        message: 'Valid base pricing is required',
+      });
+    }
+
+    const categoriesExist = await validateCategoriesExist(normalizedCategoryIds);
+
+    if (!categoriesExist) {
+      return res.status(400).json({
+        message: 'One or more selected categories do not exist',
       });
     }
 
@@ -94,19 +129,13 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
       name: name.trim(),
       description: typeof description === 'string' ? description : '',
       stock,
-      categoryId: normalizedCategoryId,
+      categoryIds: normalizedCategoryIds,
+      primaryCategoryId: normalizedPrimaryCategoryId,
       isPublished: Boolean(isPublished),
       pricing: {
-        retail: {
-          priceNet: pricing.retail.priceNet,
-          vatRate: pricing.retail.vatRate,
-          priceGross: pricing.retail.priceGross,
-        },
-        business: {
-          priceNet: pricing.business.priceNet,
-          vatRate: pricing.business.vatRate,
-          priceGross: pricing.business.priceGross,
-        },
+        priceNet: pricing.priceNet,
+        vatRate: pricing.vatRate,
+        priceGross: pricing.priceGross,
       },
     });
 
@@ -115,8 +144,8 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
       productId: result.productId,
       published: Boolean(isPublished),
     });
-  } catch (err) {
-    console.error('Add product error:', err);
+  } catch (error) {
+    console.error('Add product error:', error);
     return res.status(500).json({ message: 'Failed to add product' });
   }
 };
@@ -130,42 +159,26 @@ export const updateProductPricing = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Valid product id is required' });
     }
 
-    if (
-      !pricing?.retail ||
-      !pricing?.business ||
-      !isValidMoney(pricing.retail.priceNet) ||
-      !isValidMoney(pricing.retail.priceGross) ||
-      !isValidMoney(pricing.retail.vatRate) ||
-      !isValidMoney(pricing.business.priceNet) ||
-      !isValidMoney(pricing.business.priceGross) ||
-      !isValidMoney(pricing.business.vatRate)
-    ) {
+    if (!hasValidPricing(pricing)) {
       return res.status(400).json({
-        message: 'Valid retail and business pricing is required',
+        message: 'Valid base pricing is required',
       });
     }
 
     await updateProductPrices({
       productId,
       pricing: {
-        retail: {
-          priceNet: pricing.retail.priceNet,
-          vatRate: pricing.retail.vatRate,
-          priceGross: pricing.retail.priceGross,
-        },
-        business: {
-          priceNet: pricing.business.priceNet,
-          vatRate: pricing.business.vatRate,
-          priceGross: pricing.business.priceGross,
-        },
+        priceNet: pricing.priceNet,
+        vatRate: pricing.vatRate,
+        priceGross: pricing.priceGross,
       },
     });
 
     return res.status(200).json({
       message: 'Product pricing updated successfully',
     });
-  } catch (err) {
-    console.error('Update product pricing error:', err);
+  } catch (error) {
+    console.error('Update product pricing error:', error);
     return res.status(500).json({ message: 'Failed to update product pricing' });
   }
 };
@@ -191,8 +204,8 @@ export const deleteProductsBulk = async (req: AuthRequest, res: Response) => {
       deletedCount: result.deletedCount,
       ids: normalizedIds,
     });
-  } catch (err) {
-    console.error('Bulk delete products error:', err);
+  } catch (error) {
+    console.error('Bulk delete products error:', error);
     return res.status(500).json({ message: 'Failed to delete products' });
   }
 };
@@ -212,8 +225,8 @@ export const getProductById = async (req: Request, res: Response) => {
     }
 
     return res.status(200).json(product);
-  } catch (err) {
-    console.error('Get product by id error:', err);
+  } catch (error) {
+    console.error('Get product by id error:', error);
     return res.status(500).json({ message: 'Failed to fetch product' });
   }
 };
@@ -221,15 +234,15 @@ export const getProductById = async (req: Request, res: Response) => {
 export const updateProduct = async (req: AuthRequest, res: Response) => {
   try {
     const productId = Number(req.params.id);
-    const { name, description, stock, categoryId, isPublished, pricing } = req.body;
+    const { name, description, stock, categoryIds, primaryCategoryId, isPublished, pricing } = req.body;
 
     if (!Number.isInteger(productId) || productId <= 0) {
       return res.status(400).json({ message: 'Valid product id is required' });
     }
 
-    if (name == null || stock == null || categoryId == null || !pricing) {
+    if (name == null || stock == null || categoryIds == null || primaryCategoryId == null || !pricing) {
       return res.status(400).json({
-        message: 'Name, stock, categoryId and pricing are required',
+        message: 'Name, stock, categoryIds, primaryCategoryId and pricing are required',
       });
     }
 
@@ -241,32 +254,38 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Valid stock is required' });
     }
 
-    if (!Number.isInteger(Number(categoryId)) || Number(categoryId) <= 0) {
-      return res.status(400).json({ message: 'Valid categoryId is required' });
-    }
+    const normalizedCategoryIds = normalizeCategoryIds(categoryIds);
+    const normalizedPrimaryCategoryId = Number(primaryCategoryId);
 
-    if (
-      !pricing?.retail ||
-      !pricing?.business ||
-      !isValidMoney(pricing.retail.priceNet) ||
-      !isValidMoney(pricing.retail.priceGross) ||
-      !isValidMoney(pricing.retail.vatRate) ||
-      !isValidMoney(pricing.business.priceNet) ||
-      !isValidMoney(pricing.business.priceGross) ||
-      !isValidMoney(pricing.business.vatRate)
-    ) {
+    if (normalizedCategoryIds.length === 0) {
       return res.status(400).json({
-        message: 'Valid retail and business pricing is required',
+        message: 'At least one valid category is required',
       });
     }
 
-    const normalizedCategoryId = Number(categoryId);
-
-    const categoryExists = await validateCategoryExists(normalizedCategoryId);
-
-    if (!categoryExists) {
+    if (!Number.isInteger(normalizedPrimaryCategoryId) || normalizedPrimaryCategoryId <= 0) {
       return res.status(400).json({
-        message: 'Selected category does not exist',
+        message: 'Valid primaryCategoryId is required',
+      });
+    }
+
+    if (!normalizedCategoryIds.includes(normalizedPrimaryCategoryId)) {
+      return res.status(400).json({
+        message: 'Primary category must be included in categoryIds',
+      });
+    }
+
+    if (!hasValidPricing(pricing)) {
+      return res.status(400).json({
+        message: 'Valid base pricing is required',
+      });
+    }
+
+    const categoriesExist = await validateCategoriesExist(normalizedCategoryIds);
+
+    if (!categoriesExist) {
+      return res.status(400).json({
+        message: 'One or more selected categories do not exist',
       });
     }
 
@@ -275,27 +294,19 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
       name: name.trim(),
       description: typeof description === 'string' ? description : '',
       stock,
-      categoryId: normalizedCategoryId,
+      categoryIds: normalizedCategoryIds,
+      primaryCategoryId: normalizedPrimaryCategoryId,
       isPublished: Boolean(isPublished),
       pricing: {
-        retail: {
-          priceNet: pricing.retail.priceNet,
-          vatRate: pricing.retail.vatRate,
-          priceGross: pricing.retail.priceGross,
-        },
-        business: {
-          priceNet: pricing.business.priceNet,
-          vatRate: pricing.business.vatRate,
-          priceGross: pricing.business.priceGross,
-        },
+        priceNet: pricing.priceNet,
+        vatRate: pricing.vatRate,
+        priceGross: pricing.priceGross,
       },
     });
 
-    return res.status(200).json({
-      message: 'Product updated successfully',
-    });
-  } catch (err) {
-    console.error('Update product error:', err);
+    return res.status(200).json({ message: 'Product updated successfully' });
+  } catch (error) {
+    console.error('Update product error:', error);
     return res.status(500).json({ message: 'Failed to update product' });
   }
 };

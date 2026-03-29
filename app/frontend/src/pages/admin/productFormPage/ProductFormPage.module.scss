@@ -545,3 +545,129 @@
   box-shadow: var(--phoenix-shadow);
   overflow: hidden;
 }
+
+/* 
+
+*/
+
+.formCard {
+  background: var(--phoenix-card-bg);
+  border: 1px solid var(--phoenix-border);
+  border-radius: 16px;
+  box-shadow: var(--phoenix-shadow);
+  padding: 24px;
+}
+
+.section + .section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--phoenix-border);
+}
+
+.sectionHeader {
+  margin-bottom: 16px;
+}
+
+.sectionTitle {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--phoenix-heading);
+}
+
+.sectionDescription {
+  margin: 0;
+  color: var(--phoenix-text-muted);
+  font-size: 14px;
+}
+
+.grid,
+.pricingGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--phoenix-text);
+}
+
+.select,
+.textarea {
+  width: 100%;
+  border: 1px solid var(--phoenix-border-dark);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--phoenix-text);
+  padding: 12px 14px;
+  outline: none;
+}
+
+.textareaWrap {
+  margin-top: 16px;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 140px;
+}
+
+.switchRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-top: 30px;
+  color: var(--phoenix-text);
+}
+
+.actions {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.primaryButton,
+.secondaryButton {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primaryButton {
+  background: var(--phoenix-primary);
+  color: #fff;
+}
+
+.secondaryButton {
+  background: var(--phoenix-hover);
+  color: var(--phoenix-text);
+  border: 1px solid var(--phoenix-border);
+}
+
+.error {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(255, 99, 132, 0.08);
+  border: 1px solid rgba(255, 99, 132, 0.2);
+  color: #b42318;
+}
+
+@media (max-width: 900px) {
+  .grid,
+  .pricingGrid {
+    grid-template-columns: 1fr;
+  }
+}

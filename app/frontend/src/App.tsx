@@ -22,10 +22,9 @@ const Customers = lazy(() => import('./pages/admin/users/Users'));
 const SalesReport = lazy(() => import('./pages/admin/salesReport/SalesReport'));
 const Account = lazy(() => import('./pages/admin/account/Account'));
 const Help = lazy(() => import('./pages/admin/help/Help'));
-const AdminAddProduct = lazy(() => import('./pages/admin/addProduct/AddProduct'));
+const AdminProductFormPage = lazy(() => import('./pages/admin/productFormPage/ProductFormPage'));
 const UserDetailsPage = lazy(() => import('./pages/admin/userDetails/UserDetails'));
 const OrdersPage = lazy(() => import('./pages/admin/orders/Orders'));
-const ProductDetailsPage = lazy(() => import('./pages/admin/productDetails/ProductDetailsPage'));
 const OrderDetailsPage = lazy(() => import('./pages/admin/orderDetails/OrderDetails'));
 function App() {
   return (
@@ -55,8 +54,8 @@ function App() {
                     </Route> */}
                     <Route path="/product">
                       <Route index element={<Product />} />
-                      <Route path="add-product" element={<AdminAddProduct />} />
-                      <Route path=":id" element={<ProductDetailsPage />} />
+                      <Route path="add-product" element={<AdminProductFormPage />} />
+                      <Route path=":id" element={<AdminProductFormPage />} />
                     </Route>
 
                     <Route path="/categories" element={<Categories />} />

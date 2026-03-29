@@ -137,11 +137,6 @@ export default function DataTable<TData extends object>({
     }
   }, [resetRowSelectionKey, enableRowSelection]);
 
-  useEffect(() => {
-    if (!onSelectedRowsChange) return;
-    onSelectedRowsChange(selectedRows);
-  }, [onSelectedRowsChange, selectedRows]);
-
   const selectedCount = selectedRows.length;
 
   useEffect(() => {

@@ -1,9 +1,5 @@
 import { Request, Response } from 'express';
-import {
-  getCatalogProductWithPricing,
-  getCatalogProductsList,
-  getPriceListContextForUser,
-} from '../services/product-pricing.service';
+import { getCatalogProductWithPricing, getCatalogProductsList } from '../services/product-pricing.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 export const getCatalogProducts = async (req: Request | AuthRequest, res: Response) => {
@@ -22,14 +18,13 @@ export const getCatalogProducts = async (req: Request | AuthRequest, res: Respon
     }
 
     const authReq = req as AuthRequest;
-    const pricingContext = await getPriceListContextForUser(authReq.user?.id ?? null);
 
     const result = await getCatalogProductsList({
       page,
       limit,
       search,
       categoryId,
-      pricingContext,
+      userId: authReq.user?.id ?? null,
     });
 
     return res.status(200).json(result);

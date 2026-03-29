@@ -14,7 +14,7 @@ export default function ProductCard({ product, className = '', redirectToCart = 
   const { addItem } = useCart();
   const navigate = useNavigate();
 
-  const hasDiscount = !!product.pricing.appliedDiscount;
+  const hasDiscount = product.pricing.discountPercent > 0;
   const isOutOfStock = product.stock <= 0;
 
   const handleAddToCart = (e: MouseEvent<HTMLButtonElement>) => {

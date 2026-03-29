@@ -29,6 +29,8 @@ type GetOrdersListParams = {
 type OrderListRow = RowDataPacket & {
   id: number;
   user_id: number | null;
+  company_id: number | null;
+  customer_type: 'b2c' | 'b2b';
   guest_email: string | null;
   guest_first_name: string | null;
   guest_last_name: string | null;
@@ -51,13 +53,14 @@ type CountRow = RowDataPacket & {
 type OrderRow = RowDataPacket & {
   id: number;
   user_id: number | null;
+  company_id: number | null;
+  customer_type: 'b2c' | 'b2b';
   guest_email: string | null;
   guest_first_name: string | null;
   guest_last_name: string | null;
   guest_phone: string | null;
   coupon_id: number | null;
   coupon_code: string | null;
-  customer_group_code: string | null;
   currency: string;
   status: string;
   billing_address: string | null;
@@ -81,6 +84,8 @@ type OrderItemRow = RowDataPacket & {
   unit_price: string;
   discount_amount: string;
   total_price: string;
+  applied_discount_percent: string;
+  applied_pricing_source: 'regular' | 'company_default' | 'company_product_override';
   applied_discount_id: number | null;
   applied_discount_name: string | null;
 };
@@ -106,48 +111,54 @@ export const createOrderFromCheckout = async ({
       couponCode,
     });
 
+    const lineDiscountTotal = preview.items.reduce((sum, item) => sum + item.discount_amount, 0);
+
+    const couponDiscountTotal = preview.coupon?.discountAmount ?? 0;
+
     const [orderResult] = await connection.query<ResultSetHeader>(
       `
-      INSERT INTO orders (
-        user_id,
-        guest_email,
-        guest_first_name,
-        guest_last_name,
-        guest_phone,
-        coupon_id,
-        coupon_code,
-        customer_group_code,
-        currency,
-        status,
-        billing_address,
-        shipping_address,
-        payment_method,
-        subtotal,
-        discount_total,
-        shipping_total,
-        tax_total,
-        grand_total,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        INSERT INTO orders (
+          user_id,
+          company_id,
+          customer_type,
+          guest_email,
+          guest_first_name,
+          guest_last_name,
+          guest_phone,
+          coupon_id,
+          coupon_code,
+          currency,
+          status,
+          billing_address,
+          shipping_address,
+          payment_method,
+          subtotal,
+          discount_total,
+          shipping_total,
+          tax_total,
+          grand_total,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `,
       [
         userId,
+        preview.companyId,
+        preview.customerType,
         guest?.email ?? null,
         guest?.firstName ?? null,
         guest?.lastName ?? null,
         guest?.phone ?? null,
         preview.coupon?.id ?? null,
         preview.coupon?.code ?? null,
-        preview.customerGroupCode,
         currency,
         'pending',
         billingAddress,
         shippingAddress,
         paymentMethod,
         preview.subtotal,
-        (preview.coupon?.discountAmount ?? 0) + preview.items.reduce((sum, item) => sum + item.discount_amount, 0),
+        round2(lineDiscountTotal + couponDiscountTotal),
         0,
         0,
         preview.grandTotal,
@@ -159,18 +170,20 @@ export const createOrderFromCheckout = async ({
     for (const item of preview.items) {
       await connection.query(
         `
-        INSERT INTO order_items (
-          order_id,
-          product_id,
-          quantity,
-          original_unit_price,
-          unit_price,
-          discount_amount,
-          total_price,
-          applied_discount_id,
-          applied_discount_name
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO order_items (
+            order_id,
+            product_id,
+            quantity,
+            original_unit_price,
+            unit_price,
+            discount_amount,
+            total_price,
+            applied_discount_percent,
+            applied_pricing_source,
+            applied_discount_id,
+            applied_discount_name
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
           orderId,
@@ -180,6 +193,8 @@ export const createOrderFromCheckout = async ({
           item.unit_price,
           item.discount_amount,
           item.total_price,
+          item.applied_discount_percent,
+          item.applied_pricing_source,
           item.applied_discount_id,
           item.applied_discount_name,
         ],
@@ -188,10 +203,13 @@ export const createOrderFromCheckout = async ({
 
     await connection.commit();
 
-    return { orderId, preview };
-  } catch (err) {
+    return {
+      orderId,
+      preview,
+    };
+  } catch (error) {
     await connection.rollback();
-    throw err;
+    throw error;
   } finally {
     connection.release();
   }
@@ -199,7 +217,6 @@ export const createOrderFromCheckout = async ({
 
 export const getOrdersList = async ({ page, limit, search, sortBy, sortOrder }: GetOrdersListParams) => {
   const offset = (page - 1) * limit;
-
   const whereClauses: string[] = [];
   const params: Array<string | number> = [];
 
@@ -233,6 +250,8 @@ export const getOrdersList = async ({ page, limit, search, sortBy, sortOrder }: 
     SELECT
       o.id,
       o.user_id,
+      o.company_id,
+      o.customer_type,
       o.guest_email,
       o.guest_first_name,
       o.guest_last_name,
@@ -249,8 +268,7 @@ export const getOrdersList = async ({ page, limit, search, sortBy, sortOrder }: 
     FROM orders o
     ${whereSql}
     ORDER BY o.${sortBy} ${sortOrder}
-    LIMIT ?
-    OFFSET ?
+    LIMIT ? OFFSET ?
   `;
 
   const countQuery = `
@@ -268,6 +286,8 @@ export const getOrdersList = async ({ page, limit, search, sortBy, sortOrder }: 
     data: rows.map((row) => ({
       id: row.id,
       user_id: row.user_id,
+      company_id: row.company_id,
+      customer_type: row.customer_type,
       guest_email: row.guest_email,
       guest_first_name: row.guest_first_name,
       guest_last_name: row.guest_last_name,
@@ -295,13 +315,14 @@ export const getOrderById = async (orderId: number) => {
       SELECT
         o.id,
         o.user_id,
+        o.company_id,
+        o.customer_type,
         o.guest_email,
         o.guest_first_name,
         o.guest_last_name,
         o.guest_phone,
         o.coupon_id,
         o.coupon_code,
-        o.customer_group_code,
         o.currency,
         o.status,
         o.billing_address,
@@ -338,6 +359,8 @@ export const getOrderById = async (orderId: number) => {
         oi.unit_price,
         oi.discount_amount,
         oi.total_price,
+        oi.applied_discount_percent,
+        oi.applied_pricing_source,
         oi.applied_discount_id,
         oi.applied_discount_name
       FROM order_items oi
@@ -350,13 +373,14 @@ export const getOrderById = async (orderId: number) => {
   return {
     id: order.id,
     user_id: order.user_id,
+    company_id: order.company_id,
+    customer_type: order.customer_type,
     guest_email: order.guest_email,
     guest_first_name: order.guest_first_name,
     guest_last_name: order.guest_last_name,
     guest_phone: order.guest_phone,
     coupon_id: order.coupon_id,
     coupon_code: order.coupon_code,
-    customer_group_code: order.customer_group_code,
     currency: order.currency,
     status: order.status,
     billing_address: order.billing_address,
@@ -378,8 +402,12 @@ export const getOrderById = async (orderId: number) => {
       unit_price: Number(item.unit_price),
       discount_amount: Number(item.discount_amount),
       total_price: Number(item.total_price),
+      applied_discount_percent: Number(item.applied_discount_percent),
+      applied_pricing_source: item.applied_pricing_source,
       applied_discount_id: item.applied_discount_id,
       applied_discount_name: item.applied_discount_name,
     })),
   };
 };
+
+const round2 = (value: number) => Math.round(value * 100) / 100;

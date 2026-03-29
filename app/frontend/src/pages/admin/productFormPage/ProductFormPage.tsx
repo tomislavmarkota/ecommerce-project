@@ -1,9 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router';
-import styles from './AddProduct.module.scss';
+import { useNavigate, useParams } from 'react-router';
+import styles from './ProductFormPage.module.scss';
 import ProductImagesSortableGrid from '../../../components/productImages/ProductImageSortableGrid';
 import MultiImageUpload from '../../../components/multiImageUpload/MultiImageUpload';
-import { createProduct, type CreateProductPayload } from '../../../api/product';
+import {
+  createProduct,
+  fetchProductById,
+  updateProduct,
+  type CreateProductPayload,
+  type UpdateProductPayload,
+} from '../../../api/product';
 import {
   deleteProductImage,
   getProductImages,
@@ -12,15 +18,17 @@ import {
   uploadProductImages,
   type ProductImage,
 } from '../../../api/productImage';
-
+import CategoryTreePicker, {
+  type SelectedCategoryItem,
+} from '../../../components/categoryTreePicker/CategoryTreePicker';
 type ProductDraft = {
   name: string;
   productCode: string;
   sku: string;
   shortDescription: string;
   description: string;
-  regularPrice: string;
-  salePrice: string;
+  priceNet: string;
+  priceGross: string;
   taxRate: string;
   stock: string;
   minStock: string;
@@ -31,7 +39,8 @@ type ProductDraft = {
   status: 'published' | 'draft';
   visibility: 'public' | 'hidden';
   featured: boolean;
-  categoryId: string;
+  categoryIds: number[];
+  primaryCategoryId: number | '';
   brand: string;
   tags: string;
   discountType: 'none' | 'percentage' | 'fixed';
@@ -66,8 +75,8 @@ const initialState: ProductDraft = {
   sku: '',
   shortDescription: '',
   description: '',
-  regularPrice: '',
-  salePrice: '',
+  priceNet: '',
+  priceGross: '',
   taxRate: '25',
   stock: '',
   minStock: '',
@@ -78,21 +87,11 @@ const initialState: ProductDraft = {
   status: 'draft',
   visibility: 'public',
   featured: false,
-  categoryId: '',
+  categoryIds: [],
+  primaryCategoryId: '',
   brand: '',
   tags: '',
 };
-
-const fakeCategories = [
-  { id: '1', label: 'Kupaonica' },
-  { id: '2', label: '- Sanitarije' },
-  { id: '3', label: '-- Toaletne školjke' },
-  { id: '4', label: '-- Umivaonici' },
-  { id: '5', label: 'Pločice i materijali' },
-  { id: '6', label: '- Pločice' },
-  { id: '7', label: '-- Podne pločice' },
-  { id: '8', label: 'Vodovod i instalacije' },
-];
 
 const createLocalImageId = (): string => `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -121,21 +120,41 @@ const normalizeImages = (nextImages: LocalProductImage[]): LocalProductImage[] =
   ensureSinglePrimary(normalizeSortOrder(nextImages));
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
+
 const grossFromNet = (net: number, vatRate: number): number => round2(net * (1 + vatRate / 100));
 
-export default function AddProductPage() {
-  const navigate = useNavigate();
+const netFromGross = (gross: number, vatRate: number): number => round2(gross / (1 + vatRate / 100));
 
+export default function ProductFormPage() {
+  const navigate = useNavigate();
+  const { id } = useParams();
+
+  const productId = id ? Number(id) : null;
+  const isEditMode = Number.isInteger(productId) && Number(productId) > 0;
+  const [selectedCategoryItems, setSelectedCategoryItems] = useState<SelectedCategoryItem[]>([]);
   const [form, setForm] = useState<ProductDraft>(initialState);
   const [createdProductId, setCreatedProductId] = useState<number | null>(null);
   const [images, setImages] = useState<LocalProductImage[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  const selectedCategory = useMemo(
-    () => fakeCategories.find((item) => item.id === form.categoryId)?.label ?? 'No category selected',
-    [form.categoryId],
+  const previewImage = images.find((image) => image.is_primary === 1)?.image_url || images[0]?.image_url || null;
+
+  const selectedCategoryIds = form.categoryIds;
+
+  const resolvedPrimaryCategoryId = useMemo(() => {
+    if (form.primaryCategoryId !== '') {
+      return Number(form.primaryCategoryId);
+    }
+
+    return form.categoryIds[0] ?? null;
+  }, [form.primaryCategoryId, form.categoryIds]);
+
+  const selectedCategoryMap = useMemo(
+    () => new Map(selectedCategoryItems.map((item) => [item.id, item.name])),
+    [selectedCategoryItems],
   );
 
   useEffect(() => {
@@ -148,9 +167,107 @@ export default function AddProductPage() {
     };
   }, [images]);
 
+  useEffect(() => {
+    if (!isEditMode || !productId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadProduct = async () => {
+      try {
+        setPageLoading(true);
+        setMessage('');
+
+        const product = await fetchProductById(productId);
+
+        if (cancelled) return;
+
+        setCreatedProductId(product.id);
+
+        setForm((prev) => ({
+          ...prev,
+          name: product.name ?? '',
+          description: product.description ?? '',
+          priceNet:
+            product.pricing?.priceNet !== undefined && product.pricing?.priceNet !== null
+              ? String(product.pricing.priceNet)
+              : '',
+          priceGross:
+            product.pricing?.priceGross !== undefined && product.pricing?.priceGross !== null
+              ? String(product.pricing.priceGross)
+              : '',
+          taxRate:
+            product.pricing?.vatRate !== undefined && product.pricing?.vatRate !== null
+              ? String(product.pricing.vatRate)
+              : '25',
+          stock: product.stock !== undefined && product.stock !== null ? String(product.stock) : '',
+          categoryIds: product.categoryIds ?? [],
+          primaryCategoryId: product.primaryCategoryId ?? '',
+          status: product.isPublished ? 'published' : 'draft',
+        }));
+
+        const result = await getProductImages(productId);
+
+        if (cancelled) return;
+
+        const persistedImages: LocalProductImage[] = (result.data || []).map((image) => ({
+          ...image,
+          localId: `server-${image.id}`,
+          isLocal: false,
+        }));
+
+        setImages(normalizeImages(persistedImages));
+      } catch (error: any) {
+        console.error(error);
+        if (!cancelled) {
+          setMessage(error?.response?.data?.message || 'Failed to load product');
+        }
+      } finally {
+        if (!cancelled) {
+          setPageLoading(false);
+        }
+      }
+    };
+
+    loadProduct();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditMode, productId]);
+
+  const handleCategoryTreeChange = (categoryIds: number[]) => {
+    setForm((prev) => {
+      const currentPrimary = prev.primaryCategoryId === '' ? null : Number(prev.primaryCategoryId);
+
+      let nextPrimaryCategoryId: number | '' = prev.primaryCategoryId;
+
+      if (categoryIds.length === 0) {
+        nextPrimaryCategoryId = '';
+      } else if (currentPrimary === null || !categoryIds.includes(currentPrimary)) {
+        nextPrimaryCategoryId = categoryIds[0];
+      }
+
+      return {
+        ...prev,
+        categoryIds,
+        primaryCategoryId: nextPrimaryCategoryId,
+      };
+    });
+  };
+
+  const handlePrimaryCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+
+    setForm((prev) => ({
+      ...prev,
+      primaryCategoryId: value ? Number(value) : '',
+    }));
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-
     const nextValue = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
 
     setForm((prev) => ({
@@ -159,9 +276,53 @@ export default function AddProductPage() {
     }));
   };
 
-  const loadProductImages = async (productId: number): Promise<void> => {
+  const handleTaxRateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const vatRate = Number(e.target.value || 0);
+
+    setForm((prev) => {
+      const currentNet = Number(prev.priceNet || 0);
+
+      return {
+        ...prev,
+        taxRate: e.target.value,
+        priceGross: prev.priceNet ? String(grossFromNet(currentNet, vatRate)) : '',
+      };
+    });
+  };
+
+  const handlePriceNetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+
+    setForm((prev) => {
+      const vatRate = Number(prev.taxRate || 0);
+      const net = Number(value || 0);
+
+      return {
+        ...prev,
+        priceNet: value,
+        priceGross: value === '' ? '' : String(grossFromNet(net, vatRate)),
+      };
+    });
+  };
+
+  const handlePriceGrossChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+
+    setForm((prev) => {
+      const vatRate = Number(prev.taxRate || 0);
+      const gross = Number(value || 0);
+
+      return {
+        ...prev,
+        priceGross: value,
+        priceNet: value === '' ? '' : String(netFromGross(gross, vatRate)),
+      };
+    });
+  };
+
+  const loadProductImages = async (nextProductId: number): Promise<void> => {
     try {
-      const result = await getProductImages(productId);
+      const result = await getProductImages(nextProductId);
 
       const persistedImages: LocalProductImage[] = (result.data || []).map((image) => ({
         ...image,
@@ -209,7 +370,11 @@ export default function AddProductPage() {
     }));
 
     setImages((prev) => normalizeImages([...prev, ...newLocalImages]));
-    setMessage('Images added locally. They will be uploaded after the product is created.');
+    setMessage(
+      createdProductId
+        ? 'Images added locally.'
+        : 'Images added locally. They will be uploaded after the product is created.',
+    );
 
     return {
       uploadedCount: files.length,
@@ -260,33 +425,36 @@ export default function AddProductPage() {
     }
   };
 
-  const uploadPendingLocalImages = async (productId: number): Promise<void> => {
-    const localFiles = images
-      .filter((image) => image.isLocal && image.file)
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map((image) => image.file as File);
+  const uploadPendingLocalImages = async (nextProductId: number, filesToUpload?: File[]): Promise<void> => {
+    const localFiles =
+      filesToUpload ??
+      images
+        .filter((image) => image.isLocal && image.file)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((image) => image.file as File);
 
     if (localFiles.length === 0) {
-      await loadProductImages(productId);
+      await loadProductImages(nextProductId);
+      setMessage('✅ Product saved successfully');
       return;
     }
 
     setUploadingImages(true);
 
     try {
-      const result = await uploadProductImages(productId, localFiles, () => {});
-      await loadProductImages(productId);
+      const result = await uploadProductImages(nextProductId, localFiles, () => {});
+      await loadProductImages(nextProductId);
 
       if (result.failedFiles.length > 0 && result.uploadedCount > 0) {
-        setMessage('Product created. Some images uploaded, but a few failed.');
+        setMessage('Product saved. Some images uploaded, but a few failed.');
       } else if (result.failedFiles.length > 0) {
-        setMessage('Product created, but image upload failed.');
+        setMessage('Product saved, but image upload failed.');
       } else {
-        setMessage('✅ Product created and images uploaded successfully');
+        setMessage('✅ Product saved and images uploaded successfully');
       }
     } catch (error: any) {
       console.error(error);
-      setMessage(error?.response?.data?.message || 'Product created, but failed to upload images.');
+      setMessage(error?.response?.data?.message || 'Product saved, but failed to upload images.');
     } finally {
       setUploadingImages(false);
     }
@@ -338,6 +506,10 @@ export default function AddProductPage() {
     }
 
     if (!createdProductId || target.isLocal) {
+      if (target.isLocal && target.image_url?.startsWith('blob:')) {
+        URL.revokeObjectURL(target.image_url);
+      }
+
       setImages((prev) => normalizeImages(prev.filter((image) => image.id !== imageId)));
       return;
     }
@@ -396,66 +568,108 @@ export default function AddProductPage() {
       setMessage('❌ Failed to update alt text');
     }
   };
+
   const handleImagesChange = (nextImages: ProductImage[]) => {
     setImages(normalizeImages(nextImages as LocalProductImage[]));
   };
 
-  const buildCreatePayload = (publish: boolean): CreateProductPayload | null => {
+  const buildProductPayload = (publish: boolean): CreateProductPayload | UpdateProductPayload | null => {
     const name = form.name.trim();
     const description = form.description.trim();
     const stock = Number(form.stock || 0);
-    const categoryId = Number(form.categoryId || 0);
     const vatRate = Number(form.taxRate || 25);
-    const retailNet = Number(form.regularPrice || 0);
-    const businessNet = Number(form.salePrice || 0);
+    const priceNet = Number(form.priceNet || 0);
+    const priceGross = Number(form.priceGross || 0);
+    const primaryCategoryId =
+      form.primaryCategoryId !== '' ? Number(form.primaryCategoryId) : (form.categoryIds[0] ?? 0);
 
     if (!name) {
       setMessage('Product name is required');
       return null;
     }
 
-    if (!categoryId || Number.isNaN(categoryId)) {
-      setMessage('Please select a category');
+    if (!form.categoryIds.length) {
+      setMessage('Please select at least one category');
       return null;
     }
 
-    const payload: CreateProductPayload = {
+    if (!primaryCategoryId || Number.isNaN(primaryCategoryId)) {
+      setMessage('Please choose a primary category');
+      return null;
+    }
+
+    if (!form.categoryIds.includes(primaryCategoryId)) {
+      setMessage('Primary category must be one of the selected categories');
+      return null;
+    }
+
+    if (Number.isNaN(stock) || stock < 0) {
+      setMessage('Please enter a valid stock quantity');
+      return null;
+    }
+
+    if (Number.isNaN(priceNet) || priceNet < 0) {
+      setMessage('Please enter a valid net price');
+      return null;
+    }
+
+    if (Number.isNaN(priceGross) || priceGross < 0) {
+      setMessage('Please enter a valid gross price');
+      return null;
+    }
+
+    return {
       name,
       description,
       stock,
-      categoryId,
+      categoryIds: form.categoryIds,
+      primaryCategoryId,
       isPublished: publish,
       pricing: {
-        retail: {
-          priceNet: retailNet,
-          vatRate,
-          priceGross: grossFromNet(retailNet, vatRate),
-        },
-        business: {
-          priceNet: businessNet,
-          vatRate,
-          priceGross: grossFromNet(businessNet, vatRate),
-        },
+        priceNet: round2(priceNet),
+        vatRate: round2(vatRate),
+        priceGross: round2(priceGross),
       },
     };
-
-    return payload;
   };
 
-  const handleCreateProduct = async (publish: boolean): Promise<void> => {
-    const payload = buildCreatePayload(publish);
+  const handleSaveProduct = async (publish: boolean): Promise<void> => {
+    const payload = buildProductPayload(publish);
 
     if (!payload) {
       return;
     }
 
+    const pendingLocalFiles = images
+      .filter((image) => image.isLocal && image.file)
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((image) => image.file as File);
+
     try {
       setSaving(true);
       setMessage('');
 
-      const created = await createProduct(payload);
+      if (isEditMode && productId) {
+        await updateProduct(productId, payload);
+        setCreatedProductId(productId);
 
-      const nextProductId = created?.id;
+        setForm((prev) => ({
+          ...prev,
+          status: publish ? 'published' : 'draft',
+        }));
+
+        if (pendingLocalFiles.length > 0) {
+          await uploadPendingLocalImages(productId, pendingLocalFiles);
+        } else {
+          await loadProductImages(productId);
+          setMessage('✅ Product updated successfully');
+        }
+
+        return;
+      }
+
+      const created = await createProduct(payload);
+      const nextProductId = created?.productId ?? created?.id;
 
       if (!nextProductId) {
         throw new Error('Product created but no id was returned');
@@ -467,25 +681,33 @@ export default function AddProductPage() {
         status: publish ? 'published' : 'draft',
       }));
 
-      await uploadPendingLocalImages(nextProductId);
+      await uploadPendingLocalImages(nextProductId, pendingLocalFiles);
     } catch (error: any) {
       console.error(error);
-      setMessage(error?.response?.data?.message || error?.message || '❌ Failed to create product');
+      setMessage(error?.response?.data?.message || error?.message || '❌ Failed to save product');
     } finally {
       setSaving(false);
     }
   };
 
-  const previewImage = images.find((image) => image.is_primary === 1)?.image_url || images[0]?.image_url || null;
+  if (pageLoading) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.alert}>Loading product...</div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
       <div className={styles.topBar}>
         <div>
           <p className={styles.breadcrumb}>Apps / Ecommerce</p>
-          <h1 className={styles.title}>Add Product</h1>
+          <h1 className={styles.title}>{isEditMode ? 'Edit Product' : 'Add Product'}</h1>
           <p className={styles.subtitle}>
-            Build out product information, media, pricing, inventory, and publish settings.
+            {isEditMode
+              ? 'Update product information, media, pricing, inventory, and publish settings.'
+              : 'Build out product information, media, pricing, inventory, and publish settings.'}
           </p>
         </div>
 
@@ -497,19 +719,19 @@ export default function AddProductPage() {
           <button
             type="button"
             className={styles.secondaryButton}
-            onClick={() => handleCreateProduct(false)}
+            onClick={() => handleSaveProduct(false)}
             disabled={saving}
           >
-            {saving ? 'Saving...' : 'Save as Draft'}
+            {saving ? 'Saving...' : isEditMode ? 'Save Draft Changes' : 'Save as Draft'}
           </button>
 
           <button
             type="button"
             className={styles.primaryButton}
-            onClick={() => handleCreateProduct(true)}
+            onClick={() => handleSaveProduct(true)}
             disabled={saving}
           >
-            {saving ? 'Publishing...' : 'Publish Product'}
+            {saving ? 'Saving...' : isEditMode ? 'Update Product' : 'Publish Product'}
           </button>
         </div>
       </div>
@@ -628,36 +850,36 @@ export default function AddProductPage() {
             <div className={styles.cardHeader}>
               <div>
                 <h2>Pricing</h2>
-                <p>Set product pricing, sale pricing, and tax settings.</p>
+                <p>Set product base pricing, tax settings, and promotional discount preview.</p>
               </div>
             </div>
 
             <div className={styles.formGrid}>
               <div className={styles.fieldThird}>
-                <label htmlFor="regularPrice">Regular Price</label>
+                <label htmlFor="priceNet">Net Price</label>
                 <input
-                  id="regularPrice"
-                  name="regularPrice"
-                  value={form.regularPrice}
-                  onChange={handleChange}
+                  id="priceNet"
+                  name="priceNet"
+                  value={form.priceNet}
+                  onChange={handlePriceNetChange}
                   placeholder="0.00"
                 />
               </div>
 
               <div className={styles.fieldThird}>
-                <label htmlFor="salePrice">Business Price</label>
+                <label htmlFor="priceGross">Gross Price</label>
                 <input
-                  id="salePrice"
-                  name="salePrice"
-                  value={form.salePrice}
-                  onChange={handleChange}
+                  id="priceGross"
+                  name="priceGross"
+                  value={form.priceGross}
+                  onChange={handlePriceGrossChange}
                   placeholder="0.00"
                 />
               </div>
 
               <div className={styles.fieldThird}>
                 <label htmlFor="taxRate">Tax Rate (%)</label>
-                <select id="taxRate" name="taxRate" value={form.taxRate} onChange={handleChange}>
+                <select id="taxRate" name="taxRate" value={form.taxRate} onChange={handleTaxRateChange}>
                   <option value="25">25%</option>
                   <option value="13">13%</option>
                   <option value="5">5%</option>
@@ -827,40 +1049,78 @@ export default function AddProductPage() {
           </section>
 
           <section className={styles.card}>
-            <div className={styles.cardHeader}>
-              <div>
-                <h2>Product Category</h2>
-                <p>Assign the product to a category and add tags.</p>
-              </div>
-            </div>
+            <CategoryTreePicker
+              value={selectedCategoryIds}
+              onChange={handleCategoryTreeChange}
+              onSelectionDetailsChange={setSelectedCategoryItems}
+              selectionMode="multiple"
+              title="Product Categories"
+              subtitle="Select one or more categories for this product."
+            />
 
             <div className={styles.sideStack}>
               <div className={styles.field}>
-                <label htmlFor="categoryId">Category</label>
-                <select id="categoryId" name="categoryId" value={form.categoryId} onChange={handleChange}>
-                  <option value="">Select category</option>
-                  {fakeCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.label}
+                <label htmlFor="primaryCategoryId">Primary Category</label>
+                <select
+                  id="primaryCategoryId"
+                  name="primaryCategoryId"
+                  value={resolvedPrimaryCategoryId ?? ''}
+                  onChange={handlePrimaryCategoryChange}
+                  disabled={selectedCategoryIds.length === 0}
+                >
+                  <option value="">Select primary category</option>
+                  {selectedCategoryIds.map((categoryId) => (
+                    <option key={categoryId} value={categoryId}>
+                      {selectedCategoryMap.get(categoryId) ?? `Category #${categoryId}`}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div className={styles.summaryBox}>
-                <span className={styles.summaryLabel}>Selected Category</span>
-                <strong>{selectedCategory}</strong>
+                <span className={styles.summaryLabel}>Selected Categories</span>
+                <strong>{selectedCategoryIds.length}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <div>
+                <h2>Preview</h2>
+                <p>Quick product summary before saving.</p>
+              </div>
+            </div>
+
+            <div className={styles.sideStack}>
+              {previewImage ? (
+                <img src={previewImage} alt="Product preview" className={styles.previewImage} />
+              ) : (
+                <div className={styles.previewPlaceholder}>No image selected</div>
+              )}
+
+              <div className={styles.summaryBox}>
+                <span className={styles.summaryLabel}>Base Price</span>
+                <strong>{form.priceGross ? `${form.priceGross} €` : 'Not set'}</strong>
               </div>
 
-              <div className={styles.field}>
-                <label htmlFor="tags">Tags</label>
-                <input
-                  id="tags"
-                  name="tags"
-                  value={form.tags}
-                  onChange={handleChange}
-                  placeholder="bathroom, ceramic, premium"
-                />
+              <div className={styles.summaryBox}>
+                <span className={styles.summaryLabel}>VAT</span>
+                <strong>{form.taxRate || '0'}%</strong>
+              </div>
+
+              <div className={styles.summaryBox}>
+                <span className={styles.summaryLabel}>Status</span>
+                <strong>{form.status}</strong>
+              </div>
+
+              <div className={styles.summaryBox}>
+                <span className={styles.summaryLabel}>Primary Category</span>
+                <strong>
+                  {resolvedPrimaryCategoryId
+                    ? (selectedCategoryMap.get(resolvedPrimaryCategoryId) ?? `Category #${resolvedPrimaryCategoryId}`)
+                    : 'Not selected'}
+                </strong>
               </div>
             </div>
           </section>

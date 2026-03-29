@@ -38,23 +38,25 @@ export const productColumns: ColumnDef<ProductRow>[] = [
 
           <div className={styles.productMeta}>
             <span className={styles.productName}>{product.name}</span>
-            <span className={styles.productCategory}>
-              {product.category_name || 'No category'}
-              {product.subcategory_name ? ` / ${product.subcategory_name}` : ''}
-            </span>
+            <span className={styles.productCategory}>{product.category_name || 'No category'}</span>
           </div>
         </div>
       );
     },
   },
   {
-    accessorKey: 'retail_price_gross',
-    header: 'Retail price',
+    accessorKey: 'price_net',
+    header: 'Net price',
     cell: ({ getValue }) => formatCurrency(getValue() as number | null),
   },
   {
-    accessorKey: 'business_price_gross',
-    header: 'Business price',
+    accessorKey: 'vat_rate',
+    header: 'VAT',
+    cell: ({ getValue }) => `${Number(getValue() ?? 0)}%`,
+  },
+  {
+    accessorKey: 'price_gross',
+    header: 'Gross price',
     cell: ({ getValue }) => formatCurrency(getValue() as number | null),
   },
   {

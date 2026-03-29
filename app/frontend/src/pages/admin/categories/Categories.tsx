@@ -10,6 +10,7 @@ import {
   type CategoryTreeNode,
 } from '../../../api/category';
 import SearchableTreeSelect from '../../../components/searchableTreeSelect/SearchableTreeSelect';
+import CategoryTreePicker from '../../../components/categoryTreePicker/CategoryTreePicker';
 import { flattenCategoryTree, type CategoryOption } from '../../../utils/categoryTree';
 import styles from './categories.module.scss';
 
@@ -33,115 +34,282 @@ const emptyForm: CategoryFormState = {
 
 type Mode = 'create-root' | 'create-child' | 'edit';
 
+const cloneTree = (nodes: CategoryTreeNode[]): CategoryTreeNode[] =>
+  nodes.map((node) => ({
+    ...node,
+    children: cloneTree(node.children ?? []),
+  }));
+
+const removeNodeFromTree = (
+  nodes: CategoryTreeNode[],
+  targetId: number,
+): { nextTree: CategoryTreeNode[]; removedNode: CategoryTreeNode | null } => {
+  let removedNode: CategoryTreeNode | null = null;
+
+  const walk = (items: CategoryTreeNode[]): CategoryTreeNode[] => {
+    const result: CategoryTreeNode[] = [];
+
+    for (const item of items) {
+      if (item.id === targetId) {
+        removedNode = {
+          ...item,
+          children: cloneTree(item.children ?? []),
+        };
+        continue;
+      }
+
+      result.push({
+        ...item,
+        children: walk(item.children ?? []),
+      });
+    }
+
+    return result;
+  };
+
+  return {
+    nextTree: walk(nodes),
+    removedNode,
+  };
+};
+
+const insertNodeIntoTree = (
+  nodes: CategoryTreeNode[],
+  parentId: number | null,
+  nodeToInsert: CategoryTreeNode,
+): CategoryTreeNode[] => {
+  if (parentId == null) {
+    return [...nodes, nodeToInsert];
+  }
+
+  return nodes.map((node) => {
+    if (node.id === parentId) {
+      return {
+        ...node,
+        children: [...(node.children ?? []), nodeToInsert],
+      };
+    }
+
+    return {
+      ...node,
+      children: insertNodeIntoTree(node.children ?? [], parentId, nodeToInsert),
+    };
+  });
+};
+
+const updateNodeInTree = (
+  nodes: CategoryTreeNode[],
+  targetId: number,
+  updater: (node: CategoryTreeNode) => CategoryTreeNode,
+): CategoryTreeNode[] =>
+  nodes.map((node) => {
+    if (node.id === targetId) {
+      return updater({
+        ...node,
+        children: cloneTree(node.children ?? []),
+      });
+    }
+
+    return {
+      ...node,
+      children: updateNodeInTree(node.children ?? [], targetId, updater),
+    };
+  });
+
+const findNodeById = (nodes: CategoryTreeNode[], id: number): CategoryTreeNode | null => {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+
+    const found = findNodeById(node.children ?? [], id);
+    if (found) return found;
+  }
+
+  return null;
+};
+
+const findNodeWithParent = (
+  nodes: CategoryTreeNode[],
+  id: number,
+  parentId: number | null = null,
+): { node: CategoryTreeNode; parentId: number | null } | null => {
+  for (const node of nodes) {
+    if (node.id === id) {
+      return { node, parentId };
+    }
+
+    const found = findNodeWithParent(node.children ?? [], id, node.id);
+    if (found) return found;
+  }
+
+  return null;
+};
+
+const isDescendantOf = (nodes: CategoryTreeNode[], ancestorId: number, targetId: number): boolean => {
+  const ancestorNode = findNodeById(nodes, ancestorId);
+
+  if (!ancestorNode) {
+    return false;
+  }
+
+  const walk = (node: CategoryTreeNode): boolean => {
+    if (node.id === targetId) {
+      return true;
+    }
+
+    return (node.children ?? []).some((child) => walk(child));
+  };
+
+  return (ancestorNode.children ?? []).some((child) => walk(child));
+};
+
+const rebuildPathAndLevel = (nodes: CategoryTreeNode[], parentPath = '', level = 0): CategoryTreeNode[] =>
+  nodes.map((node) => {
+    const slug = node.slug || '';
+    const path = parentPath ? `${parentPath}/${slug}` : slug;
+
+    return {
+      ...node,
+      level,
+      path,
+      children: rebuildPathAndLevel(node.children ?? [], path, level + 1),
+    };
+  });
+
+const buildCategoryDetailsFromTreeNode = (node: CategoryTreeNode, parentId: number | null = null): CategoryDetails => ({
+  id: node.id,
+  name: node.name,
+  slug: node.slug,
+  description: node.description ?? '',
+  image_url: node.image_url ?? null,
+  sort_order: Number(node.sort_order ?? 0),
+  is_active: Boolean(node.is_active),
+  parent_id: parentId,
+  path: node.path,
+  level: node.level,
+  created_at: '',
+  updated_at: '',
+});
+
+const applyLocalCategoryPreview = ({
+  tree,
+  selectedCategory,
+  form,
+  selectedCategoryId,
+  mode,
+}: {
+  tree: CategoryTreeNode[];
+  selectedCategory: CategoryDetails | null;
+  form: CategoryFormState;
+  selectedCategoryId: number | null;
+  mode: Mode;
+}) => {
+  if (mode !== 'edit' || !selectedCategory || !selectedCategoryId) {
+    return {
+      previewTree: tree,
+      previewSelectedCategory: selectedCategory,
+    };
+  }
+
+  const originalParentId = selectedCategory.parent_id ?? null;
+  const nextParentId = form.parentId === '' ? null : Number(form.parentId);
+
+  let nextTree = cloneTree(tree);
+
+  const updateNode = (node: CategoryTreeNode): CategoryTreeNode => ({
+    ...node,
+    name: form.name || node.name,
+    description: form.description,
+    image_url: form.imageUrl || null,
+    sort_order: Number(form.sortOrder) || 0,
+    is_active: form.isActive,
+  });
+
+  if (originalParentId === nextParentId) {
+    nextTree = updateNodeInTree(nextTree, selectedCategoryId, updateNode);
+  } else {
+    const { nextTree: treeWithoutNode, removedNode } = removeNodeFromTree(nextTree, selectedCategoryId);
+
+    if (removedNode) {
+      const movedNode = updateNode(removedNode);
+      nextTree = insertNodeIntoTree(treeWithoutNode, nextParentId, movedNode);
+    } else {
+      nextTree = treeWithoutNode;
+    }
+  }
+
+  nextTree = rebuildPathAndLevel(nextTree);
+
+  const updatedNode = findNodeById(nextTree, selectedCategoryId);
+
+  const previewSelectedCategory: CategoryDetails | null = updatedNode
+    ? {
+        ...selectedCategory,
+        name: form.name || selectedCategory.name,
+        description: form.description,
+        image_url: form.imageUrl || null,
+        sort_order: Number(form.sortOrder) || 0,
+        is_active: form.isActive,
+        parent_id: nextParentId,
+        path: updatedNode.path,
+        level: updatedNode.level,
+      }
+    : selectedCategory;
+
+  return {
+    previewTree: nextTree,
+    previewSelectedCategory,
+  };
+};
+
 const CategoriesPage: React.FC = () => {
   const [tree, setTree] = useState<CategoryTreeNode[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CategoryDetails | null>(null);
+  const [detailsCache, setDetailsCache] = useState<Record<number, CategoryDetails>>({});
 
   const [form, setForm] = useState<CategoryFormState>(emptyForm);
   const [mode, setMode] = useState<Mode>('create-root');
-
-  const [treeSearch, setTreeSearch] = useState('');
-  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState('');
 
-  const categoryOptions = useMemo<CategoryOption[]>(() => flattenCategoryTree(tree), [tree]);
+  const { previewTree, previewSelectedCategory } = useMemo(
+    () =>
+      applyLocalCategoryPreview({
+        tree,
+        selectedCategory,
+        form,
+        selectedCategoryId,
+        mode,
+      }),
+    [tree, selectedCategory, form, selectedCategoryId, mode],
+  );
+
+  const categoryOptions = useMemo<CategoryOption[]>(() => flattenCategoryTree(previewTree), [previewTree]);
 
   const selectedOption = useMemo(
     () => categoryOptions.find((item) => item.id === selectedCategoryId) ?? null,
     [categoryOptions, selectedCategoryId],
   );
 
-  const toggleExpanded = (categoryId: number) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
-      } else {
-        next.add(categoryId);
-      }
-
-      return next;
-    });
-  };
-
-  const expandAllParentsForMatches = (nodes: CategoryTreeNode[], query: string): Set<number> => {
-    const normalized = query.trim().toLowerCase();
-    const expanded = new Set<number>();
-
-    if (!normalized) return expanded;
-
-    const walk = (node: CategoryTreeNode): boolean => {
-      const selfMatches =
-        node.name.toLowerCase().includes(normalized) ||
-        node.slug.toLowerCase().includes(normalized) ||
-        node.path.toLowerCase().includes(normalized);
-
-      const childMatches = (node.children ?? []).some((child) => walk(child));
-
-      if (childMatches) {
-        expanded.add(node.id);
-      }
-
-      return selfMatches || childMatches;
-    };
-
-    nodes.forEach((node) => {
-      walk(node);
-    });
-
-    return expanded;
-  };
-
-  const filterTree = (nodes: CategoryTreeNode[], query: string): CategoryTreeNode[] => {
-    const normalized = query.trim().toLowerCase();
-
-    if (!normalized) return nodes;
-
-    return nodes
-      .map((node) => {
-        const filteredChildren = filterTree(node.children ?? [], query);
-
-        const selfMatches =
-          node.name.toLowerCase().includes(normalized) ||
-          node.slug.toLowerCase().includes(normalized) ||
-          node.path.toLowerCase().includes(normalized);
-
-        if (selfMatches || filteredChildren.length > 0) {
-          return {
-            ...node,
-            children: filteredChildren,
-          };
-        }
-
-        return null;
-      })
-      .filter(Boolean) as CategoryTreeNode[];
-  };
-
-  const filteredTree = useMemo(() => filterTree(tree, treeSearch), [tree, treeSearch]);
-
-  const findNodeById = (nodes: CategoryTreeNode[], id: number): CategoryTreeNode | null => {
-    for (const node of nodes) {
-      if (node.id === id) return node;
-
-      const found = findNodeById(node.children ?? [], id);
-      if (found) return found;
-    }
-
-    return null;
-  };
-
   const countDirectChildren = (categoryId: number | null) => {
     if (!categoryId) return 0;
 
-    const node = findNodeById(tree, categoryId);
+    const node = findNodeById(previewTree, categoryId);
     return node?.children?.length ?? 0;
+  };
+
+  const syncFormFromCategory = (category: CategoryDetails) => {
+    setForm({
+      name: category.name ?? '',
+      description: category.description ?? '',
+      imageUrl: category.image_url ?? '',
+      sortOrder: Number(category.sort_order ?? 0),
+      isActive: Boolean(category.is_active),
+      parentId: category.parent_id ?? '',
+    });
   };
 
   const loadTree = async (preserveSelectedId?: number | null) => {
@@ -159,20 +327,38 @@ const CategoriesPage: React.FC = () => {
   };
 
   const loadCategoryDetails = async (categoryId: number) => {
+    const cached = detailsCache[categoryId];
+
+    if (cached) {
+      setSelectedCategory((prev) => {
+        if (prev?.id === cached.id && prev.name === cached.name && prev.path === cached.path) {
+          return prev;
+        }
+        return cached;
+      });
+
+      setSelectedCategoryId(cached.id);
+      syncFormFromCategory(cached);
+      setMode('edit');
+      return;
+    }
+
     const category = await fetchCategoryById(categoryId);
 
-    setSelectedCategory(category);
-    setSelectedCategoryId(category.id);
+    setDetailsCache((prev) => ({
+      ...prev,
+      [category.id]: category,
+    }));
 
-    setForm({
-      name: category.name ?? '',
-      description: category.description ?? '',
-      imageUrl: category.image_url ?? '',
-      sortOrder: Number(category.sort_order ?? 0),
-      isActive: Boolean(category.is_active),
-      parentId: category.parent_id ?? '',
+    setSelectedCategory((prev) => {
+      if (prev?.id === category.id && prev.name === category.name && prev.path === category.path) {
+        return prev;
+      }
+      return category;
     });
 
+    setSelectedCategoryId(category.id);
+    syncFormFromCategory(category);
     setMode('edit');
   };
 
@@ -192,22 +378,93 @@ const CategoriesPage: React.FC = () => {
     void init();
   }, []);
 
-  useEffect(() => {
-    if (!treeSearch.trim()) return;
-
-    const autoExpanded = expandAllParentsForMatches(tree, treeSearch);
-    setExpandedIds(autoExpanded);
-  }, [tree, treeSearch]);
-
   const handleSelectCategory = async (categoryId: number) => {
     try {
       setMessage('');
-      setExpandedIds((prev) => new Set(prev).add(categoryId));
       await loadCategoryDetails(categoryId);
     } catch (error) {
       console.error(error);
       setMessage('Failed to load category details');
     }
+  };
+
+  const handleTreeSelectionChange = (categoryIds: number[]) => {
+    const nextSelectedId = categoryIds[0] ?? null;
+
+    setMessage('');
+    setSelectedCategoryId(nextSelectedId);
+
+    if (!nextSelectedId) {
+      setSelectedCategory(null);
+      setForm(emptyForm);
+      setMode('create-root');
+      return;
+    }
+
+    const treeMatch = findNodeWithParent(previewTree, nextSelectedId);
+
+    if (treeMatch) {
+      const optimisticCategory = buildCategoryDetailsFromTreeNode(treeMatch.node, treeMatch.parentId);
+
+      setSelectedCategory(optimisticCategory);
+      syncFormFromCategory(optimisticCategory);
+      setMode('edit');
+    }
+
+    void loadCategoryDetails(nextSelectedId);
+  };
+
+  const handleDropCategory = (draggedId: number, targetParentId: number | null) => {
+    if (!draggedId) return;
+
+    if (targetParentId === draggedId) {
+      setMessage('A category cannot be its own parent');
+      return;
+    }
+
+    if (targetParentId !== null && isDescendantOf(previewTree, draggedId, targetParentId)) {
+      setMessage('A category cannot be moved inside one of its own descendants');
+      return;
+    }
+
+    const treeMatch = findNodeWithParent(previewTree, draggedId);
+
+    if (treeMatch) {
+      const optimisticCategory = buildCategoryDetailsFromTreeNode(treeMatch.node, targetParentId);
+
+      setSelectedCategoryId(draggedId);
+      setSelectedCategory(optimisticCategory);
+      syncFormFromCategory({
+        ...optimisticCategory,
+        parent_id: targetParentId,
+      });
+      setMode('edit');
+      setMessage('Parent changed locally. Save changes to persist.');
+      return;
+    }
+
+    void (async () => {
+      try {
+        const category = await fetchCategoryById(draggedId);
+
+        setDetailsCache((prev) => ({
+          ...prev,
+          [draggedId]: category,
+        }));
+
+        setSelectedCategoryId(draggedId);
+        setSelectedCategory(category);
+        syncFormFromCategory({
+          ...category,
+          parent_id: targetParentId,
+        });
+        setMode('edit');
+        setMessage('Parent changed locally. Save changes to persist.');
+      } catch (error) {
+        console.error(error);
+        setMessage('Failed to load dropped category');
+      }
+    })();
   };
 
   const handleCreateRoot = () => {
@@ -223,8 +480,6 @@ const CategoriesPage: React.FC = () => {
       setMessage('Select a category first to create a child category');
       return;
     }
-
-    setExpandedIds((prev) => new Set(prev).add(selectedCategoryId));
 
     setForm({
       ...emptyForm,
@@ -251,6 +506,16 @@ const CategoriesPage: React.FC = () => {
   const handleParentChange = (value: number | '') => {
     if (mode === 'edit' && selectedCategoryId && value === selectedCategoryId) {
       setMessage('A category cannot be its own parent');
+      return;
+    }
+
+    if (
+      mode === 'edit' &&
+      selectedCategoryId &&
+      value !== '' &&
+      isDescendantOf(previewTree, selectedCategoryId, Number(value))
+    ) {
+      setMessage('A category cannot be moved inside one of its own descendants');
       return;
     }
 
@@ -283,10 +548,6 @@ const CategoriesPage: React.FC = () => {
           isActive: form.isActive,
         });
 
-        if (created.parent_id) {
-          setExpandedIds((prev) => new Set(prev).add(created.parent_id as number));
-        }
-
         await loadTree(created.id);
         await loadCategoryDetails(created.id);
         setMessage('✅ Category created successfully');
@@ -313,10 +574,6 @@ const CategoriesPage: React.FC = () => {
         await moveCategory(selectedCategoryId, {
           parentId: nextParentId,
         });
-      }
-
-      if (nextParentId) {
-        setExpandedIds((prev) => new Set(prev).add(nextParentId));
       }
 
       await loadTree(selectedCategoryId);
@@ -363,46 +620,6 @@ const CategoriesPage: React.FC = () => {
     }
   };
 
-  const renderTreeNodes = (nodes: CategoryTreeNode[], depth = 0): React.ReactNode => {
-    return nodes.map((node) => {
-      const hasChildren = (node.children ?? []).length > 0;
-      const isExpanded = expandedIds.has(node.id);
-      const isSelected = node.id === selectedCategoryId;
-
-      const prefix = depth === 0 ? '' : `${'-'.repeat(depth)} `;
-
-      return (
-        <div key={node.id} className={styles.treeNode}>
-          <div
-            className={`${styles.treeRow} ${isSelected ? styles.treeRowActive : ''}`}
-            style={{ paddingLeft: `${12 + depth * 18}px` }}
-          >
-            <button
-              type="button"
-              className={`${styles.expandBtn} ${!hasChildren ? styles.expandBtnHidden : ''}`}
-              onClick={() => hasChildren && toggleExpanded(node.id)}
-              aria-label={hasChildren ? (isExpanded ? 'Collapse category' : 'Expand category') : undefined}
-              tabIndex={hasChildren ? 0 : -1}
-            >
-              {hasChildren ? (isExpanded ? '▾' : '▸') : ''}
-            </button>
-
-            <button type="button" className={styles.treeLabelBtn} onClick={() => void handleSelectCategory(node.id)}>
-              <span className={`${styles.treeItemLabel} ${hasChildren ? styles.treeItemParent : ''}`}>
-                {prefix}
-                {node.name}
-              </span>
-            </button>
-          </div>
-
-          {hasChildren && isExpanded ? (
-            <div className={styles.treeChildren}>{renderTreeNodes(node.children, depth + 1)}</div>
-          ) : null}
-        </div>
-      );
-    });
-  };
-
   if (loading) {
     return <div className={styles.pageState}>Loading categories...</div>;
   }
@@ -432,32 +649,17 @@ const CategoriesPage: React.FC = () => {
       {message ? <div className={styles.alert}>{message}</div> : null}
 
       <div className={styles.layout}>
-        <section className={styles.treeCard}>
-          <div className={styles.sectionHeader}>
-            <div>
-              <h3>Category tree</h3>
-              <p>Browse, search, expand, and manage the full category hierarchy.</p>
-            </div>
-          </div>
-
-          <div className={styles.treeSearchWrap}>
-            <input
-              type="text"
-              value={treeSearch}
-              onChange={(e) => setTreeSearch(e.target.value)}
-              placeholder="Search categories..."
-              className={styles.searchInput}
-            />
-          </div>
-
-          <div className={styles.treeList}>
-            {filteredTree.length === 0 ? (
-              <div className={styles.emptyStateSmall}>No categories found</div>
-            ) : (
-              renderTreeNodes(filteredTree)
-            )}
-          </div>
-        </section>
+        <CategoryTreePicker
+          value={selectedCategoryId ? [selectedCategoryId] : []}
+          onChange={handleTreeSelectionChange}
+          selectionMode="single"
+          treeData={previewTree}
+          focusedId={selectedCategoryId}
+          onDropCategory={handleDropCategory}
+          title="Category tree"
+          subtitle="Browse, search, select, and drag categories to a new parent."
+          className={styles.treeCard}
+        />
 
         <section className={styles.formCard}>
           <div className={styles.sectionHeader}>
@@ -557,19 +759,19 @@ const CategoriesPage: React.FC = () => {
               </label>
             </div>
 
-            {mode === 'edit' && selectedCategory ? (
+            {mode === 'edit' && previewSelectedCategory ? (
               <div className={styles.metaCard}>
                 <div className={styles.metaRow}>
                   <span className={styles.metaLabel}>Slug</span>
-                  <strong>{selectedCategory.slug}</strong>
+                  <strong>{previewSelectedCategory.slug}</strong>
                 </div>
                 <div className={styles.metaRow}>
                   <span className={styles.metaLabel}>Path</span>
-                  <strong>{selectedCategory.path}</strong>
+                  <strong>{previewSelectedCategory.path}</strong>
                 </div>
                 <div className={styles.metaRow}>
                   <span className={styles.metaLabel}>Level</span>
-                  <strong>{selectedCategory.level}</strong>
+                  <strong>{previewSelectedCategory.level}</strong>
                 </div>
               </div>
             ) : null}
@@ -624,12 +826,14 @@ const CategoriesPage: React.FC = () => {
 
           <div className={styles.summaryItem}>
             <span className={styles.metaLabel}>Children</span>
-            <strong>{selectedCategory ? countDirectChildren(selectedCategory.id) : '-'}</strong>
+            <strong>{previewSelectedCategory ? countDirectChildren(previewSelectedCategory.id) : '-'}</strong>
           </div>
 
           <div className={styles.summaryItem}>
             <span className={styles.metaLabel}>Status</span>
-            <strong>{selectedCategory ? (selectedCategory.is_active ? 'Active' : 'Inactive') : '-'}</strong>
+            <strong>
+              {previewSelectedCategory ? (previewSelectedCategory.is_active ? 'Active' : 'Inactive') : '-'}
+            </strong>
           </div>
         </div>
       </section>
