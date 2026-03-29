@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-
 import {
   getCatalogProductWithPricing,
   getCatalogProductsList,
@@ -11,8 +10,16 @@ export const getCatalogProducts = async (req: Request | AuthRequest, res: Respon
   try {
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 48);
+
     const rawSearch = typeof req.query.search === 'string' ? req.query.search.trim() : '';
     const search = rawSearch || '';
+
+    const rawCategoryId = req.query.categoryId;
+    const categoryId = rawCategoryId != null && rawCategoryId !== '' ? Number(rawCategoryId) : null;
+
+    if (categoryId !== null && (!Number.isInteger(categoryId) || categoryId <= 0)) {
+      return res.status(400).json({ message: 'Invalid categoryId' });
+    }
 
     const authReq = req as AuthRequest;
     const pricingContext = await getPriceListContextForUser(authReq.user?.id ?? null);
@@ -21,6 +28,7 @@ export const getCatalogProducts = async (req: Request | AuthRequest, res: Respon
       page,
       limit,
       search,
+      categoryId,
       pricingContext,
     });
 

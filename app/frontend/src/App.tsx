@@ -26,6 +26,7 @@ const AdminAddProduct = lazy(() => import('./pages/admin/addProduct/AddProduct')
 const UserDetailsPage = lazy(() => import('./pages/admin/userDetails/UserDetails'));
 const OrdersPage = lazy(() => import('./pages/admin/orders/Orders'));
 const ProductDetailsPage = lazy(() => import('./pages/admin/productDetails/ProductDetailsPage'));
+const OrderDetailsPage = lazy(() => import('./pages/admin/orderDetails/OrderDetails'));
 function App() {
   return (
     <UserProvider>
@@ -61,6 +62,7 @@ function App() {
                     <Route path="/categories" element={<Categories />} />
                     <Route path="/transaction" element={<Transaction />} />
                     <Route path="/orders" element={<OrdersPage />} />
+                    <Route path="/orders/:id" element={<OrderDetailsPage />} />
                     <Route path="/users" element={<Customers />} />
                     <Route path="/users/:id" element={<UserDetailsPage />} />
                     <Route path="/sales-report" element={<SalesReport />} />

@@ -49,3 +49,8 @@ export const fetchOrders = async ({
 
   return res.data as OrdersResponse;
 };
+
+export const fetchOrderById = async (id: number) => {
+  const response = await api.get(`/orders/${id}`);
+  return response.data;
+};

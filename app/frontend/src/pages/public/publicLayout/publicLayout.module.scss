@@ -6,6 +6,9 @@
 .header {
   background: #fff;
   border-bottom: 1px solid var(--phoenix-border, #e6e9ef);
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
 
 .container {
@@ -19,27 +22,62 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 24px;
 }
 
 .logo {
-  text-decoration: none;
-  color: var(--phoenix-heading, #141824);
-  font-size: 1.25rem;
-  font-weight: 700;
+  width: 60px;
+  height: 60px;
+}
+
+.logoImage {
+  height: 100%;
+  width: 100%;
+  max-width: 160px;
+  object-fit: contain;
 }
 
 .nav {
   display: flex;
   align-items: center;
   gap: 18px;
+  flex-wrap: wrap;
 }
 
 .navLink {
   text-decoration: none;
   color: var(--phoenix-text, #31374a);
   font-weight: 600;
+  font-size: 0.95rem;
+  padding: 8px 0;
+  transition:
+    color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.navLink:hover {
+  color: var(--phoenix-primary, #3874ff);
 }
 
 .main {
   padding: 32px 0 48px;
+}
+
+@media (max-width: 768px) {
+  .header .container {
+    min-height: auto;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .logoImage {
+    height: 60px;
+    max-width: 140px;
+  }
+
+  .nav {
+    gap: 14px;
+  }
 }

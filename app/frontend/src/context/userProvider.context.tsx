@@ -1,9 +1,10 @@
-import axios from 'axios';
 import { createContext, useEffect, useState } from 'react';
+import api from '../api/axios';
 import { setAccessToken as setStoredAccessToken, clearAccessToken } from '../utils/tokenManager';
 import { refreshSession } from '../utils/refreshManager';
 
 interface User {
+  id?: number;
   email: string;
   role: 'admin' | 'user' | 'editor' | 'superAdmin';
 }
@@ -26,10 +27,8 @@ const UserContext = createContext<UserContextType>({
   loading: true,
 });
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
 const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUserState] = useState<User | null>(null);
   const [accessToken, setAccessTokenState] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,35 +37,53 @@ const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     setStoredAccessToken(token);
   };
 
+  const setUser = (nextUser: User | null) => {
+    setUserState(nextUser);
+  };
+
   useEffect(() => {
+    let isMounted = true;
+
     const restoreSession = async () => {
       try {
         const data = await refreshSession();
+
+        if (!isMounted) return;
 
         const newToken = data?.accessToken ?? null;
         const userData = data?.user ?? null;
 
         setAccessToken(newToken);
         setUser(userData);
-      } catch {
+      } catch (error) {
+        if (!isMounted) return;
+
+        console.error('Session restore failed:', error);
         setAccessToken(null);
         setUser(null);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    restoreSession();
+    void restoreSession();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  console.log('USER', user);
   const logout = async () => {
     try {
-      await axios.post(`${API_URL}/api/auth/logout`, {}, { withCredentials: true });
+      await api.post('/auth/logout', {}, { withCredentials: true });
+    } catch (error) {
+      console.error('Logout failed:', error);
     } finally {
       clearAccessToken();
       setAccessTokenState(null);
-      setUser(null);
+      setUserState(null);
     }
   };
 

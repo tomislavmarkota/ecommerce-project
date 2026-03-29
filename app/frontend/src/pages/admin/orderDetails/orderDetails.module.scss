@@ -1,0 +1,254 @@
+.page {
+  display: grid;
+  gap: 24px;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--phoenix-text-muted, #6e7891);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pageTitle {
+  margin: 0;
+  color: var(--phoenix-heading, #141824);
+  font-size: clamp(1.75rem, 2vw, 2.2rem);
+  line-height: 1.15;
+}
+
+.pageSubtitle {
+  margin: 8px 0 0;
+  color: var(--phoenix-text-muted, #6e7891);
+}
+
+.backButton {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid #d7dce5;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--phoenix-text, #31374a);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+
+  &:hover {
+    background: #fafbfc;
+    border-color: #c5ccd8;
+  }
+}
+
+.topGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.mainGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 420px);
+  gap: 24px;
+  align-items: start;
+}
+
+.sideStack {
+  display: grid;
+  gap: 24px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--phoenix-border, #e6e9ef);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+  padding: 24px;
+
+  h3 {
+    margin: 0 0 18px;
+    color: var(--phoenix-heading, #141824);
+    font-size: 1.05rem;
+  }
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+
+  > div {
+    display: grid;
+    gap: 6px;
+    padding: 16px;
+    border: 1px solid var(--phoenix-border, #e6e9ef);
+    border-radius: 16px;
+    background: #fff;
+  }
+
+  span {
+    color: var(--phoenix-text-muted, #6e7891);
+    font-size: 0.9rem;
+  }
+
+  strong {
+    color: var(--phoenix-heading, #141824);
+    word-break: break-word;
+  }
+}
+
+.itemsTableWrap {
+  overflow-x: auto;
+}
+
+.itemsTable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 720px;
+
+  thead th {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--phoenix-border, #e6e9ef);
+    color: var(--phoenix-text-muted, #6e7891);
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  tbody td {
+    padding: 16px;
+    border-bottom: 1px solid #f0f2f6;
+    color: var(--phoenix-text, #31374a);
+    vertical-align: middle;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  tbody tr:hover td {
+    background: #fbfcfe;
+  }
+}
+
+.addressBlock {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--phoenix-border, #e6e9ef);
+  border-radius: 16px;
+  background: #fff;
+
+  & + & {
+    margin-top: 14px;
+  }
+
+  span {
+    color: var(--phoenix-text-muted, #6e7891);
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  p {
+    margin: 0;
+    color: var(--phoenix-heading, #141824);
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+  }
+}
+
+.totals {
+  display: grid;
+  gap: 12px;
+
+  > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 4px 0;
+  }
+
+  span {
+    color: var(--phoenix-text-muted, #6e7891);
+  }
+
+  strong {
+    color: var(--phoenix-heading, #141824);
+  }
+}
+
+.totalRow {
+  margin-top: 6px;
+  padding-top: 16px !important;
+  border-top: 1px solid var(--phoenix-border, #e6e9ef);
+
+  span,
+  strong {
+    color: var(--phoenix-heading, #141824);
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+}
+
+.pageState {
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  border: 1px dashed #d7dce5;
+  border-radius: 16px;
+  background: #fbfcfe;
+  color: var(--phoenix-text-muted, #6e7891);
+}
+
+@media (max-width: 1100px) {
+  .mainGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .topGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .pageHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .backButton {
+    width: 100%;
+  }
+
+  .metaGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 18px;
+  }
+}
+.clickableRow {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.clickableRow:hover {
+  background-color: #f8fafd;
+}

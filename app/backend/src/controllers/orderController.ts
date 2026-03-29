@@ -1,7 +1,11 @@
 // src/controllers/orderController.ts
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { createOrderFromCheckout, getOrdersList } from '../services/orderService/order.service';
+import {
+  createOrderFromCheckout,
+  getOrderById as getOrderByIdService,
+  getOrdersList,
+} from '../services/orderService/order.service';
 
 const ALLOWED_SORT_FIELDS = new Set(['id', 'created_at', 'status', 'grand_total', 'subtotal']);
 
@@ -85,7 +89,29 @@ export const getOrders = async (req: Request, res: Response) => {
 
     const result = await getOrdersList({ page, limit, search, sortBy, sortOrder });
     return res.status(200).json(result);
-  } catch {
+  } catch (err) {
+    console.error('Get orders error:', err);
     return res.status(500).json({ message: 'Failed to fetch orders' });
+  }
+};
+
+export const getOrderById = async (req: Request, res: Response) => {
+  try {
+    const orderId = Number(req.params.id);
+
+    if (!Number.isInteger(orderId) || orderId <= 0) {
+      return res.status(400).json({ message: 'Valid order id is required' });
+    }
+
+    const order = await getOrderByIdService(orderId);
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    return res.status(200).json(order);
+  } catch (err) {
+    console.error('Get order by id error:', err);
+    return res.status(500).json({ message: 'Failed to fetch order' });
   }
 };

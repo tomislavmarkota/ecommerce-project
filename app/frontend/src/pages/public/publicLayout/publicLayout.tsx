@@ -1,6 +1,7 @@
 import { Outlet, Link } from 'react-router';
 import { useCart } from '../../../context/cartProvider.context';
 import styles from './PublicLayout.module.scss';
+import logo from '../../../assets/logo.jfif';
 
 export default function PublicLayout() {
   const { totalItems } = useCart();
@@ -9,8 +10,8 @@ export default function PublicLayout() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div className={styles.container}>
-          <Link to="/" className={styles.logo}>
-            MyShop
+          <Link to="/" className={styles.logo} aria-label="Mirbar home">
+            <img src={logo} alt="Mirbar logo" className={styles.logoImage} />
           </Link>
 
           <nav className={styles.nav}>

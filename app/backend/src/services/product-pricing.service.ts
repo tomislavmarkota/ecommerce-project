@@ -9,9 +9,7 @@ type ProductBaseRow = RowDataPacket & {
   stock: number;
   is_published: number;
   category_id: number | null;
-  subcategory_id: number | null;
   category_name: string | null;
-  subcategory_name: string | null;
   thumbnail: string | null;
 };
 
@@ -22,9 +20,7 @@ type CatalogListRow = RowDataPacket & {
   stock: number;
   is_published: number;
   category_id: number | null;
-  subcategory_id: number | null;
   category_name: string | null;
-  subcategory_name: string | null;
   thumbnail: string | null;
 };
 
@@ -81,9 +77,7 @@ export type CatalogProduct = {
   stock: number;
   isPublished: boolean;
   categoryId: number | null;
-  subcategoryId: number | null;
   categoryName: string | null;
-  subcategoryName: string | null;
   thumbnail: string | null;
   pricing: ResolvedPrice;
 };
@@ -180,20 +174,20 @@ export const getCatalogProductBaseById = async (productId: number): Promise<Prod
         p.description,
         p.stock,
         p.is_published,
-        p.category_id,
-        p.subcategory_id,
+        pc.category_id,
         c.name AS category_name,
-        sc.name AS subcategory_name,
         (
-          SELECT pi.image_url
+          SELECT COALESCE(pi.thumbnail_url, pi.image_url)
           FROM product_images pi
           WHERE pi.product_id = p.id
-          ORDER BY pi.sort_order ASC, pi.id ASC
+          ORDER BY pi.is_primary DESC, pi.sort_order ASC, pi.id ASC
           LIMIT 1
         ) AS thumbnail
       FROM products p
-      LEFT JOIN categories c ON c.id = p.category_id
-      LEFT JOIN subcategories sc ON sc.id = p.subcategory_id
+      LEFT JOIN product_categories pc
+        ON pc.product_id = p.id AND pc.is_primary = 1
+      LEFT JOIN categories c
+        ON c.id = pc.category_id
       WHERE p.id = ?
       LIMIT 1
     `,
@@ -228,7 +222,6 @@ export const getPriceForProductFromPriceList = async (
 export const getProductDiscounts = async (
   productId: number,
   categoryId: number | null,
-  subcategoryId: number | null,
   customerGroupId: number | null,
 ): Promise<DiscountRow[]> => {
   const [rows] = await pool.query<DiscountRow[]>(
@@ -242,7 +235,6 @@ export const getProductDiscounts = async (
       FROM discounts d
       LEFT JOIN discount_products dp ON dp.discount_id = d.id
       LEFT JOIN discount_categories dc ON dc.discount_id = d.id
-      LEFT JOIN discount_subcategories ds ON ds.discount_id = d.id
       LEFT JOIN discount_customer_groups dcg ON dcg.discount_id = d.id
       WHERE d.is_active = 1
         AND (d.starts_at IS NULL OR d.starts_at <= NOW())
@@ -254,11 +246,10 @@ export const getProductDiscounts = async (
         AND (
           dp.product_id = ?
           OR (? IS NOT NULL AND dc.category_id = ?)
-          OR (? IS NOT NULL AND ds.subcategory_id = ?)
         )
       ORDER BY d.priority DESC, d.id DESC
     `,
-    [customerGroupId, productId, categoryId, categoryId, subcategoryId, subcategoryId],
+    [customerGroupId, productId, categoryId, categoryId],
   );
 
   return rows;
@@ -277,12 +268,7 @@ export const resolveProductPrice = async (productId: number, userId?: number | n
   const originalGross = Number(priceRow.price_gross);
   const vatRate = Number(priceRow.vat_rate);
 
-  const discounts = await getProductDiscounts(
-    productId,
-    product.category_id,
-    product.subcategory_id,
-    context.customerGroupId,
-  );
+  const discounts = await getProductDiscounts(productId, product.category_id, context.customerGroupId);
 
   let bestDiscount: ResolvedPrice['appliedDiscount'] = null;
   let bestDiscountAmountGross = 0;
@@ -347,9 +333,7 @@ export const getCatalogProductWithPricing = async (
     stock: product.stock,
     isPublished: Boolean(product.is_published),
     categoryId: product.category_id,
-    subcategoryId: product.subcategory_id,
     categoryName: product.category_name,
-    subcategoryName: product.subcategory_name,
     thumbnail: product.thumbnail,
     pricing,
   };
@@ -359,11 +343,13 @@ export const getCatalogProductsList = async ({
   page,
   limit,
   search,
+  categoryId,
   pricingContext,
 }: {
   page: number;
   limit: number;
   search: string;
+  categoryId?: number | null;
   pricingContext: PriceListContext;
 }) => {
   const offset = (page - 1) * limit;
@@ -376,10 +362,29 @@ export const getCatalogProductsList = async ({
         p.name LIKE ?
         OR p.description LIKE ?
         OR c.name LIKE ?
-        OR sc.name LIKE ?
       )
     `);
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+
+  if (categoryId) {
+    whereClauses.push(`
+      pc.category_id IN (
+        WITH RECURSIVE category_tree AS (
+          SELECT id
+          FROM categories
+          WHERE id = ?
+
+          UNION ALL
+
+          SELECT c.id
+          FROM categories c
+          INNER JOIN category_tree ct ON c.parent_id = ct.id
+        )
+        SELECT id FROM category_tree
+      )
+    `);
+    params.push(categoryId);
   }
 
   const whereSql = `WHERE ${whereClauses.join(' AND ')}`;
@@ -391,20 +396,20 @@ export const getCatalogProductsList = async ({
       p.description,
       p.stock,
       p.is_published,
-      p.category_id,
-      p.subcategory_id,
+      pc.category_id,
       c.name AS category_name,
-      sc.name AS subcategory_name,
       (
-        SELECT pi.image_url
+        SELECT COALESCE(pi.thumbnail_url, pi.image_url)
         FROM product_images pi
         WHERE pi.product_id = p.id
-        ORDER BY pi.sort_order ASC, pi.id ASC
+        ORDER BY pi.is_primary DESC, pi.sort_order ASC, pi.id ASC
         LIMIT 1
       ) AS thumbnail
     FROM products p
-    LEFT JOIN categories c ON c.id = p.category_id
-    LEFT JOIN subcategories sc ON sc.id = p.subcategory_id
+    LEFT JOIN product_categories pc
+      ON pc.product_id = p.id AND pc.is_primary = 1
+    LEFT JOIN categories c
+      ON c.id = pc.category_id
     ${whereSql}
     ORDER BY p.created_at DESC
     LIMIT ?
@@ -414,8 +419,10 @@ export const getCatalogProductsList = async ({
   const countQuery = `
     SELECT COUNT(*) AS total
     FROM products p
-    LEFT JOIN categories c ON c.id = p.category_id
-    LEFT JOIN subcategories sc ON sc.id = p.subcategory_id
+    LEFT JOIN product_categories pc
+      ON pc.product_id = p.id AND pc.is_primary = 1
+    LEFT JOIN categories c
+      ON c.id = pc.category_id
     ${whereSql}
   `;
 
@@ -427,12 +434,7 @@ export const getCatalogProductsList = async ({
       const priceRow = await getPriceForProductFromPriceList(row.id, pricingContext.priceListId);
       if (!priceRow) return null;
 
-      const discounts = await getProductDiscounts(
-        row.id,
-        row.category_id,
-        row.subcategory_id,
-        pricingContext.customerGroupId,
-      );
+      const discounts = await getProductDiscounts(row.id, row.category_id, pricingContext.customerGroupId);
 
       const originalNet = Number(priceRow.price_net);
       const originalGross = Number(priceRow.price_gross);
@@ -475,9 +477,7 @@ export const getCatalogProductsList = async ({
         stock: row.stock,
         isPublished: Boolean(row.is_published),
         categoryId: row.category_id,
-        subcategoryId: row.subcategory_id,
         categoryName: row.category_name,
-        subcategoryName: row.subcategory_name,
         thumbnail: row.thumbnail,
         pricing: {
           productId: row.id,

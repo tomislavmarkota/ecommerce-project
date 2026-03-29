@@ -5,6 +5,7 @@ import PageTitle from '../../../components/pageTitle/PageTitle';
 import DataTable from '../../../components/dataTable/DataTable';
 import { useProducts } from '../../../hooks/useProducts';
 import { productColumns } from './product.columns';
+import styles from './product.module.scss';
 
 function Product() {
   const navigate = useNavigate();
@@ -30,6 +31,9 @@ function Product() {
   return (
     <div>
       <PageTitle name="Product" />
+      <button type="button" className={`${styles.btn} ${styles.primaryButton}`} onClick={() => navigate('add-product')}>
+        Add product
+      </button>
 
       <DataTable
         title="Products"

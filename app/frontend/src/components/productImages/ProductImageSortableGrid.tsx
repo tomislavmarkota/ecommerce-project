@@ -13,13 +13,13 @@ import SortableImageCard from './SortableImageCard';
 import type { ProductImage } from './SortableImageCard';
 import { reorderProductImages } from '../../api/productImage';
 
-type ProductImagesSortableGridProps = {
-  productId: number;
-  images: ProductImage[];
-  onImagesChange?: (images: ProductImage[]) => void;
+type ProductImagesSortableGridProps<TImage extends ProductImage = ProductImage> = {
+  productId?: number | null;
+  images: TImage[];
+  onImagesChange?: (images: TImage[]) => void;
   onSetPrimary?: (imageId: number) => void;
   onDelete?: (imageId: number) => void;
-  onEditAltText?: (image: ProductImage) => void;
+  onEditAltText?: (image: TImage) => void;
 };
 
 const ProductImagesSortableGrid: React.FC<ProductImagesSortableGridProps> = ({
@@ -32,6 +32,8 @@ const ProductImagesSortableGrid: React.FC<ProductImagesSortableGridProps> = ({
 }) => {
   const [items, setItems] = useState<ProductImage[]>([]);
   const [savingOrder, setSavingOrder] = useState(false);
+
+  const isPersistedMode = Boolean(productId);
 
   useEffect(() => {
     const sorted = [...images].sort((a, b) => a.sort_order - b.sort_order);
@@ -47,22 +49,34 @@ const ProductImagesSortableGrid: React.FC<ProductImagesSortableGridProps> = ({
 
   const itemIds = useMemo(() => items.map((item) => item.id), [items]);
 
-  const persistOrder = async (nextItems: ProductImage[]) => {
-    const payload = nextItems.map((item, index) => ({
+  const normalizeSortOrder = (nextItems: ProductImage[]): ProductImage[] =>
+    nextItems.map((item, index) => ({
+      ...item,
+      sort_order: index,
+    }));
+
+  const persistOrder = async (nextItems: ProductImage[]): Promise<void> => {
+    const normalized = normalizeSortOrder(nextItems);
+
+    // CREATE MODE:
+    // Product does not exist yet, so reorder only in local state.
+    if (!isPersistedMode || !productId) {
+      setItems(normalized);
+      onImagesChange?.(normalized);
+      return;
+    }
+
+    // EDIT MODE:
+    // Persist reordered image positions to backend.
+    const payload = normalized.map((item) => ({
       id: item.id,
-      sortOrder: index,
+      sortOrder: item.sort_order,
     }));
 
     setSavingOrder(true);
 
     try {
       await reorderProductImages(productId, payload);
-
-      const normalized = nextItems.map((item, index) => ({
-        ...item,
-        sort_order: index,
-      }));
-
       setItems(normalized);
       onImagesChange?.(normalized);
     } catch (error) {
@@ -73,7 +87,7 @@ const ProductImagesSortableGrid: React.FC<ProductImagesSortableGridProps> = ({
     }
   };
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent): Promise<void> => {
     const { active, over } = event;
 
     if (!over || active.id === over.id) {
@@ -87,19 +101,23 @@ const ProductImagesSortableGrid: React.FC<ProductImagesSortableGridProps> = ({
       return;
     }
 
-    const reordered = arrayMove(items, oldIndex, newIndex).map((item, index) => ({
-      ...item,
-      sort_order: index,
-    }));
+    const reordered = arrayMove(items, oldIndex, newIndex);
+    const normalized = normalizeSortOrder(reordered);
 
-    setItems(reordered);
-    await persistOrder(reordered);
+    setItems(normalized);
+    onImagesChange?.(normalized);
+
+    await persistOrder(normalized);
   };
 
   return (
     <div>
       <div style={{ marginBottom: 12, fontSize: 13, color: '#666' }}>
-        {savingOrder ? 'Saving order...' : 'Drag images to reorder'}
+        {savingOrder
+          ? 'Saving order...'
+          : isPersistedMode
+            ? 'Drag images to reorder'
+            : 'Drag images to reorder (saved locally until product is created)'}
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

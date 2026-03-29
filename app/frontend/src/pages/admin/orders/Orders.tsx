@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { PaginationState, SortingState } from '@tanstack/react-table';
+import { useNavigate } from 'react-router';
 import PageTitle from '../../../components/pageTitle/PageTitle';
 import DataTable from '../../../components/dataTable/DataTable';
 import { useOrders } from '../../../hooks/useOrders';
 import { orderColumns } from './orders.columns';
 
 export default function OrdersPage() {
+  const navigate = useNavigate();
+
   const [globalFilter, setGlobalFilter] = useState('');
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({
@@ -45,6 +48,7 @@ export default function OrdersPage() {
         onPaginationChange={setPagination}
         pageCount={Math.ceil(total / pagination.pageSize)}
         totalRows={total}
+        onRowClick={(row) => navigate(`/orders/${row.id}`)}
       />
     </div>
   );
