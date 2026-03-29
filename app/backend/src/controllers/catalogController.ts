@@ -19,12 +19,14 @@ export const getCatalogProducts = async (req: Request | AuthRequest, res: Respon
 
     const authReq = req as AuthRequest;
 
+    const userId = authReq.user?.id || authReq.user?.user?.id || null;
+
     const result = await getCatalogProductsList({
       page,
       limit,
       search,
       categoryId,
-      userId: authReq.user?.id ?? null,
+      userId,
     });
 
     return res.status(200).json(result);

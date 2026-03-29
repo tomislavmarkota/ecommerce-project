@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as userService from '../services/users.service';
+import * as registerService from '../services/registerB2B.service';
 import { deleteUsersByIds } from '../services/users.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -55,10 +56,7 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
   try {
     const userId = Number(req.params.id);
     const data = req.body;
-
-    const currentUserRole = req.user.role;
-
-    console.log('req.user', req);
+    const currentUserRole = req.user?.role || req.user?.user?.role;
 
     const user = await userService.updateUser(userId, data, currentUserRole!);
 
@@ -68,7 +66,6 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
     });
   } catch (err) {
     console.error(err);
-
     res.status(500).json({
       message: 'Server error',
     });
@@ -111,5 +108,28 @@ export const deleteUsersBulk = async (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error('Bulk delete users error:', err);
     return res.status(500).json({ message: 'Failed to delete users' });
+  }
+};
+
+export const registerB2B = async (req: Request, res: Response) => {
+  try {
+    const result = await registerService.registerB2B(req.body);
+
+    return res.status(201).json({
+      message: 'B2B account created successfully',
+      user: result.user,
+    });
+  } catch (error: any) {
+    console.error('registerB2B error:', error);
+
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        message: error.message,
+      });
+    }
+
+    return res.status(500).json({
+      message: 'Server error',
+    });
   }
 };

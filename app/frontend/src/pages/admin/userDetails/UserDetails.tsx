@@ -32,11 +32,14 @@ type UserType = {
   city?: string;
   address?: string;
   role: string;
+  role_id?: number;
   created_at?: string;
+  customerType: 'b2b' | 'b2c';
+  company_id: number | null;
+  companyName: string | null;
   orders?: Order[];
   wishlist?: WishlistItem[];
 };
-
 export default function UserDetails() {
   const { id } = useParams();
   const [user, setUser] = useState<UserType | null>(null);
@@ -92,9 +95,14 @@ export default function UserDetails() {
           <div>
             <h2 className={styles.customerName}>{user.name}</h2>
             <p className={styles.joinedText}>{joinedDate}</p>
+
             <div className={styles.roleRow}>
               <span className={`${styles.badge} ${styles[user.role.toLowerCase()] || styles.defaultBadge}`}>
                 {user.role}
+              </span>
+
+              <span className={`${styles.badge} ${styles[user.customerType.toLowerCase()] || styles.defaultBadge}`}>
+                {user.customerType.toUpperCase()}
               </span>
             </div>
           </div>
@@ -114,6 +122,16 @@ export default function UserDetails() {
           <div className={styles.infoBlock}>
             <span className={styles.infoLabel}>Role</span>
             <strong>{user.role}</strong>
+          </div>
+
+          <div className={styles.infoBlock}>
+            <span className={styles.infoLabel}>Customer type</span>
+            <strong>{user.customerType.toUpperCase()}</strong>
+          </div>
+
+          <div className={styles.infoBlock}>
+            <span className={styles.infoLabel}>Company</span>
+            <strong>{user.companyName || '—'}</strong>
           </div>
         </div>
       </section>

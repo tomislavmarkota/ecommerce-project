@@ -11,6 +11,20 @@
   white-space: nowrap;
 }
 
+.b2b {
+  color: #0f5132;
+  background: #d1e7dd;
+}
+
+.b2c {
+  color: #084298;
+  background: #cfe2ff;
+}
+
+.mutedText {
+  color: var(--phoenix-text-muted);
+}
+
 .defaultBadge {
   color: #46506b;
   background: #edf1f7;

@@ -9,6 +9,8 @@ import AppContainer from './pages/appContainer/AppContainer';
 import PublicLayout from './pages/public/publicLayout/publicLayout';
 import Categories from './pages/admin/categories/Categories';
 
+const B2BLogin = lazy(() => import('./pages/admin/b2bLogin/B2BLogin'));
+const B2BRegister = lazy(() => import('./pages/b2bRegister/B2BRegister'));
 const Home = lazy(() => import('./pages/public/products/PublicProducts'));
 const PublicProducts = lazy(() => import('./pages/public/products/PublicProducts'));
 const PublicProductDetails = lazy(() => import('./pages/public/productDetails/PublicProductDetails'));
@@ -42,7 +44,9 @@ function App() {
                   <Route path="/checkout" element={<CheckoutPage />} />
                 </Route>
 
+                <Route path="/b2b-register" element={<B2BRegister />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/b2b-login" element={<B2BLogin />} />
 
                 <Route element={<ProtectedRoute />}>
                   <Route element={<AppContainer />}>

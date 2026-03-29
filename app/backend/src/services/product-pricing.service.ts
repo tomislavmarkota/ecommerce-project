@@ -34,12 +34,6 @@ type CountRow = RowDataPacket & {
   total: number;
 };
 
-type UserPricingContextRow = RowDataPacket & {
-  id: number;
-  customer_type: 'b2c' | 'b2b';
-  company_id: number | null;
-};
-
 type CompanyDefaultDiscountRow = RowDataPacket & {
   pricing_discount_percent: string;
 };
@@ -86,6 +80,12 @@ const getCatalogProductBaseById = async (productId: number): Promise<ProductBase
   return rows[0] ?? null;
 };
 
+type UserPricingContextRow = RowDataPacket & {
+  id: number;
+  customer_type: 'b2c' | 'b2b';
+  company_id: number | null;
+};
+
 const getUserPricingContext = async (
   userId?: number | null,
 ): Promise<{
@@ -103,7 +103,10 @@ const getUserPricingContext = async (
     `
       SELECT
         u.id,
-        u.customer_type,
+        CASE
+          WHEN u.company_id IS NOT NULL THEN 'b2b'
+          ELSE 'b2c'
+        END AS customer_type,
         u.company_id
       FROM users u
       WHERE u.id = ?

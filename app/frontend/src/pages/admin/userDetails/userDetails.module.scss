@@ -118,7 +118,10 @@
 }
 
 .roleRow {
-  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .infoRight {

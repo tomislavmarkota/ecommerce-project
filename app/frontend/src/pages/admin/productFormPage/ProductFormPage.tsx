@@ -749,7 +749,7 @@ export default function ProductFormPage() {
             </div>
 
             <div className={styles.formGrid}>
-              <div className={styles.fieldFull}>
+              <div className={styles.fieldHalf}>
                 <label htmlFor="name">Product Name</label>
                 <input
                   id="name"
@@ -760,25 +760,9 @@ export default function ProductFormPage() {
                 />
               </div>
 
-              <div className={styles.fieldThird}>
-                <label htmlFor="productCode">Product Code</label>
-                <input
-                  id="productCode"
-                  name="productCode"
-                  value={form.productCode}
-                  onChange={handleChange}
-                  placeholder="PRD-1001"
-                />
-              </div>
-
-              <div className={styles.fieldThird}>
+              <div className={styles.fieldHalf}>
                 <label htmlFor="sku">SKU</label>
                 <input id="sku" name="sku" value={form.sku} onChange={handleChange} placeholder="Enter SKU" />
-              </div>
-
-              <div className={styles.fieldThird}>
-                <label htmlFor="brand">Brand</label>
-                <input id="brand" name="brand" value={form.brand} onChange={handleChange} placeholder="Brand name" />
               </div>
 
               <div className={styles.fieldFull}>
@@ -979,37 +963,6 @@ export default function ProductFormPage() {
               <div className={styles.fieldHalf}>
                 <label htmlFor="minStock">Minimum Stock Alert</label>
                 <input id="minStock" name="minStock" value={form.minStock} onChange={handleChange} placeholder="5" />
-              </div>
-            </div>
-          </section>
-
-          <section className={styles.card}>
-            <div className={styles.cardHeader}>
-              <div>
-                <h2>Shipping Details</h2>
-                <p>Enter product shipping dimensions and weight.</p>
-              </div>
-            </div>
-
-            <div className={styles.formGrid}>
-              <div className={styles.fieldQuarter}>
-                <label htmlFor="weight">Weight</label>
-                <input id="weight" name="weight" value={form.weight} onChange={handleChange} placeholder="1.2 kg" />
-              </div>
-
-              <div className={styles.fieldQuarter}>
-                <label htmlFor="width">Width</label>
-                <input id="width" name="width" value={form.width} onChange={handleChange} placeholder="20 cm" />
-              </div>
-
-              <div className={styles.fieldQuarter}>
-                <label htmlFor="height">Height</label>
-                <input id="height" name="height" value={form.height} onChange={handleChange} placeholder="30 cm" />
-              </div>
-
-              <div className={styles.fieldQuarter}>
-                <label htmlFor="length">Length</label>
-                <input id="length" name="length" value={form.length} onChange={handleChange} placeholder="40 cm" />
               </div>
             </div>
           </section>

@@ -15,6 +15,8 @@ type UserRow = {
   name: string;
   email: string;
   role: string;
+  customerType: 'b2b' | 'b2c';
+  companyName: string | null;
 };
 
 export default function Customers() {

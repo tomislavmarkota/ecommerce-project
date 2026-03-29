@@ -3,8 +3,15 @@ export const buildUserQuery = ({ search, role }: { search?: string; role?: strin
   const params: any[] = [];
 
   if (search) {
-    where += ` (u.name LIKE ? OR u.email LIKE ? OR r.name LIKE ?) `;
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    where += `
+      (
+        u.name LIKE ?
+        OR u.email LIKE ?
+        OR r.name LIKE ?
+        OR u.company_name LIKE ?
+      )
+    `;
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
 
   if (role) {

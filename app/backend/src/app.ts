@@ -12,6 +12,7 @@ import catalogRouter from './routes/catalogRoutes/catalog.routes';
 import checkoutRouter from './routes/checkoutRoutes/checkout.routes';
 import orderRouter from './routes/orderRoutes/order.routes';
 import productImageRoutes from './routes/productImage.routes';
+import companyRoutes from './routes/companyRoutes';
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use('/api/roles', rolesRouter);
 app.use('/api/checkout', checkoutRouter);
 app.use('/api/orders', orderRouter);
 app.use('/api/product-images', productImageRoutes);
+app.use('/api/companies', companyRoutes);
 
 app.get('/', (_req, res) => {
   res.status(200).json({ message: 'API is running' });
