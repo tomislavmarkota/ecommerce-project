@@ -117,7 +117,9 @@ export const registerB2B = async (input: RegisterB2BInput) => {
   if (!name) throw createHttpError(400, 'Name is required');
   if (!email) throw createHttpError(400, 'Email is required');
   if (!password) throw createHttpError(400, 'Password is required');
-  if (password.length < 8) throw createHttpError(400, 'Password must be at least 8 characters');
+  if (password.length < 8) {
+    throw createHttpError(400, 'Password must be at least 8 characters');
+  }
   if (!companyName) throw createHttpError(400, 'Company name is required');
   if (!vatNumber) throw createHttpError(400, 'VAT number is required');
 
@@ -162,13 +164,12 @@ export const registerB2B = async (input: RegisterB2BInput) => {
         vat_number,
         is_verified,
         is_active,
-        provider,
         email_verified,
         role_id,
         customer_group_id,
         company_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       name,
@@ -186,7 +187,6 @@ export const registerB2B = async (input: RegisterB2BInput) => {
       vatNumber,
       0,
       1,
-      'local',
       0,
       1,
       b2bCustomerGroupId,

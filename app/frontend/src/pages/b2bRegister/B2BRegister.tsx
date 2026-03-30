@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import axios from 'axios';
 import styles from './B2BRegister.module.scss';
 import { registerB2B } from '../../api/auth';
 
@@ -10,11 +9,14 @@ type RegisterForm = {
   password: string;
   confirmPassword: string;
   phone: string;
-  addressLine1: string;
-  addressLine2: string;
+  address: string;
   city: string;
   postalCode: string;
   country: string;
+  deliveryAddress: string;
+  deliveryCity: string;
+  deliveryPostalCode: string;
+  deliveryCountry: string;
   companyName: string;
   vatNumber: string;
 };
@@ -25,11 +27,14 @@ const initialForm: RegisterForm = {
   password: '',
   confirmPassword: '',
   phone: '',
-  addressLine1: '',
-  addressLine2: '',
+  address: '',
   city: '',
   postalCode: '',
   country: '',
+  deliveryAddress: '',
+  deliveryCity: '',
+  deliveryPostalCode: '',
+  deliveryCountry: '',
   companyName: '',
   vatNumber: '',
 };
@@ -61,7 +66,6 @@ export default function B2BRegister() {
     if (!form.vatNumber.trim()) return 'VAT number is required for B2B registration.';
     if (!form.city.trim()) return 'City is required.';
     if (!form.country.trim()) return 'Country is required.';
-
     return '';
   };
 
@@ -84,11 +88,14 @@ export default function B2BRegister() {
         email: form.email.trim().toLowerCase(),
         password: form.password,
         phone: form.phone.trim() || null,
-        address_line1: form.addressLine1.trim() || null,
-        address_line2: form.addressLine2.trim() || null,
-        city: form.city.trim(),
+        address: form.address.trim() || null,
+        city: form.city.trim() || null,
         postal_code: form.postalCode.trim() || null,
-        country: form.country.trim(),
+        country: form.country.trim() || null,
+        delivery_address: form.deliveryAddress.trim() || null,
+        delivery_city: form.deliveryCity.trim() || null,
+        delivery_postal_code: form.deliveryPostalCode.trim() || null,
+        delivery_country: form.deliveryCountry.trim() || null,
         company_name: form.companyName.trim(),
         vat_number: form.vatNumber.trim(),
       };
@@ -107,6 +114,7 @@ export default function B2BRegister() {
       setIsSubmitting(false);
     }
   };
+
   return (
     <div className={styles.page}>
       <div className={styles.card}>
@@ -253,32 +261,17 @@ export default function B2BRegister() {
           </div>
 
           <div className={styles.field}>
-            <label htmlFor="addressLine1" className={styles.label}>
-              Address line 1
+            <label htmlFor="address" className={styles.label}>
+              Address
             </label>
             <input
-              id="addressLine1"
-              name="addressLine1"
+              id="address"
+              name="address"
               type="text"
-              value={form.addressLine1}
+              value={form.address}
               onChange={handleChange}
               className={styles.input}
               placeholder="Street and house number"
-            />
-          </div>
-
-          <div className={styles.field}>
-            <label htmlFor="addressLine2" className={styles.label}>
-              Address line 2
-            </label>
-            <input
-              id="addressLine2"
-              name="addressLine2"
-              type="text"
-              value={form.addressLine2}
-              onChange={handleChange}
-              className={styles.input}
-              placeholder="Apartment, floor, office, etc."
             />
           </div>
 
@@ -313,6 +306,68 @@ export default function B2BRegister() {
                 placeholder="Enter postal code"
               />
             </div>
+          </div>
+
+          <div className={styles.field}>
+            <label htmlFor="deliveryAddress" className={styles.label}>
+              Delivery address
+            </label>
+            <input
+              id="deliveryAddress"
+              name="deliveryAddress"
+              type="text"
+              value={form.deliveryAddress}
+              onChange={handleChange}
+              className={styles.input}
+              placeholder="Delivery street and house number"
+            />
+          </div>
+
+          <div className={styles.gridTwo}>
+            <div className={styles.field}>
+              <label htmlFor="deliveryCity" className={styles.label}>
+                Delivery city
+              </label>
+              <input
+                id="deliveryCity"
+                name="deliveryCity"
+                type="text"
+                value={form.deliveryCity}
+                onChange={handleChange}
+                className={styles.input}
+                placeholder="Enter delivery city"
+              />
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="deliveryPostalCode" className={styles.label}>
+                Delivery postal code
+              </label>
+              <input
+                id="deliveryPostalCode"
+                name="deliveryPostalCode"
+                type="text"
+                value={form.deliveryPostalCode}
+                onChange={handleChange}
+                className={styles.input}
+                placeholder="Enter delivery postal code"
+              />
+            </div>
+          </div>
+
+          <div className={styles.field}>
+            <label htmlFor="deliveryCountry" className={styles.label}>
+              Delivery country
+            </label>
+            <input
+              id="deliveryCountry"
+              name="deliveryCountry"
+              type="text"
+              value={form.deliveryCountry}
+              onChange={handleChange}
+              className={styles.input}
+              placeholder="Enter delivery country"
+            />
           </div>
 
           {error && <div className={styles.error}>{error}</div>}
