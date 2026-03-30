@@ -1,5 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router';
+import { PaginationState, SortingState } from '@tanstack/react-table';
 import DataTable from '../../../components/dataTable/DataTable';
 import EditUserModal from '../../../components/editUserModal/EditUserModal';
 import { UserContext } from '../../../context/userProvider.context';
@@ -31,21 +32,35 @@ type UserType = {
   email: string;
   city?: string;
   address?: string;
-  role: string;
+  role?: string;
   role_id?: number;
   created_at?: string;
-  customerType: 'b2b' | 'b2c';
+  customerType?: 'b2b' | 'b2c';
   company_id: number | null;
   companyName: string | null;
   orders?: Order[];
   wishlist?: WishlistItem[];
 };
+
 export default function UserDetails() {
   const { id } = useParams();
   const [user, setUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
   const currentUser = useContext(UserContext);
   const [open, setOpen] = useState(false);
+
+  const [ordersSorting, setOrdersSorting] = useState<SortingState>([]);
+  const [wishlistSorting, setWishlistSorting] = useState<SortingState>([]);
+
+  const [ordersPagination, setOrdersPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+
+  const [wishlistPagination, setWishlistPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -75,6 +90,9 @@ export default function UserDetails() {
     return <div className={styles.pageState}>User not found</div>;
   }
 
+  const roleKey = String(user.role ?? '').toLowerCase();
+  const customerTypeKey = String(user.customerType ?? '').toLowerCase();
+
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
@@ -93,16 +111,16 @@ export default function UserDetails() {
           <div className={styles.avatar}>{user.name?.slice(0, 1).toUpperCase() || 'U'}</div>
 
           <div>
-            <h2 className={styles.customerName}>{user.name}</h2>
+            <h2 className={styles.customerName}>{user.name || 'Unknown user'}</h2>
             <p className={styles.joinedText}>{joinedDate}</p>
 
             <div className={styles.roleRow}>
-              <span className={`${styles.badge} ${styles[user.role.toLowerCase()] || styles.defaultBadge}`}>
-                {user.role}
+              <span className={`${styles.badge} ${styles[roleKey] || styles.defaultBadge}`}>
+                {user.role || 'Unknown'}
               </span>
 
-              <span className={`${styles.badge} ${styles[user.customerType.toLowerCase()] || styles.defaultBadge}`}>
-                {user.customerType.toUpperCase()}
+              <span className={`${styles.badge} ${styles[customerTypeKey] || styles.defaultBadge}`}>
+                {(user.customerType || 'Unknown').toUpperCase()}
               </span>
             </div>
           </div>
@@ -116,17 +134,17 @@ export default function UserDetails() {
 
           <div className={styles.infoBlock}>
             <span className={styles.infoLabel}>Email</span>
-            <strong>{user.email}</strong>
+            <strong>{user.email || 'No email provided'}</strong>
           </div>
 
           <div className={styles.infoBlock}>
             <span className={styles.infoLabel}>Role</span>
-            <strong>{user.role}</strong>
+            <strong>{user.role || 'Unknown'}</strong>
           </div>
 
           <div className={styles.infoBlock}>
             <span className={styles.infoLabel}>Customer type</span>
-            <strong>{user.customerType.toUpperCase()}</strong>
+            <strong>{(user.customerType || 'Unknown').toUpperCase()}</strong>
           </div>
 
           <div className={styles.infoBlock}>
@@ -145,6 +163,11 @@ export default function UserDetails() {
         emptyMessage="No orders found"
         showToolbar={false}
         showFooter={false}
+        sorting={ordersSorting}
+        onSortingChange={setOrdersSorting}
+        pagination={ordersPagination}
+        onPaginationChange={setOrdersPagination}
+        pageCount={1}
       />
 
       <div className={styles.sectionSpacing} />
@@ -158,6 +181,11 @@ export default function UserDetails() {
         emptyMessage="No wishlist items found"
         showToolbar={false}
         showFooter={false}
+        sorting={wishlistSorting}
+        onSortingChange={setWishlistSorting}
+        pagination={wishlistPagination}
+        onPaginationChange={setWishlistPagination}
+        pageCount={1}
       />
 
       {open && (

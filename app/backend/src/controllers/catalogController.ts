@@ -1,5 +1,9 @@
 import { Request, Response } from 'express';
-import { getCatalogProductWithPricing, getCatalogProductsList } from '../services/product-pricing.service';
+import {
+  getCatalogProductWithPricing,
+  getCatalogProductsList,
+  getPriceListContextForUser,
+} from '../services/product-pricing.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 export const getCatalogProducts = async (req: Request | AuthRequest, res: Response) => {
@@ -18,15 +22,16 @@ export const getCatalogProducts = async (req: Request | AuthRequest, res: Respon
     }
 
     const authReq = req as AuthRequest;
-
     const userId = authReq.user?.id || authReq.user?.user?.id || null;
+
+    const pricingContext = await getPriceListContextForUser(userId);
 
     const result = await getCatalogProductsList({
       page,
       limit,
       search,
       categoryId,
-      userId,
+      pricingContext,
     });
 
     return res.status(200).json(result);
@@ -45,7 +50,10 @@ export const getCatalogProduct = async (req: Request | AuthRequest, res: Respons
     }
 
     const authReq = req as AuthRequest;
-    const product = await getCatalogProductWithPricing(productId, authReq.user?.id ?? null);
+    const userId = authReq.user?.id || authReq.user?.user?.id || null;
+
+    const pricingContext = await getPriceListContextForUser(userId);
+    const product = await getCatalogProductWithPricing(productId, pricingContext);
 
     if (!product || !product.isPublished) {
       return res.status(404).json({ message: 'Product not found' });

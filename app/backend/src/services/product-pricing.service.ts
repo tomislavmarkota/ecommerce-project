@@ -42,7 +42,87 @@ type CompanyProductDiscountRow = RowDataPacket & {
   discount_percent: string;
 };
 
+type PriceListContextRow = RowDataPacket & {
+  id: number;
+  company_id: number | null;
+  customer_group_id: number | null;
+  customer_group_price_list_id: number | null;
+  company_customer_group_id: number | null;
+  company_customer_group_price_list_id: number | null;
+};
+
+type PriceListPriceRow = RowDataPacket & {
+  price_net: string;
+  price_gross: string;
+  vat_rate: string;
+};
+
+export type PriceListContext = {
+  customerType: 'b2c' | 'b2b';
+  companyId: number | null;
+  customerGroupId: number | null;
+  priceListId: number | null;
+};
+
 const round2 = (value: number) => Math.round(value * 100) / 100;
+
+export const getPriceListContextForUser = async (userId?: number | null): Promise<PriceListContext> => {
+  if (!userId) {
+    return {
+      customerType: 'b2c',
+      companyId: null,
+      customerGroupId: null,
+      priceListId: null,
+    };
+  }
+
+  const [rows] = await pool.query<PriceListContextRow[]>(
+    `
+      SELECT
+        u.id,
+        u.company_id,
+        u.customer_group_id,
+        cg.price_list_id AS customer_group_price_list_id,
+        c.customer_group_id AS company_customer_group_id,
+        ccg.price_list_id AS company_customer_group_price_list_id
+      FROM users u
+      LEFT JOIN customer_groups cg
+        ON cg.id = u.customer_group_id
+      LEFT JOIN companies c
+        ON c.id = u.company_id
+      LEFT JOIN customer_groups ccg
+        ON ccg.id = c.customer_group_id
+      WHERE u.id = ?
+      LIMIT 1
+    `,
+    [userId],
+  );
+
+  if (!rows.length) {
+    return {
+      customerType: 'b2c',
+      companyId: null,
+      customerGroupId: null,
+      priceListId: null,
+    };
+  }
+
+  const row = rows[0];
+  const customerType: 'b2c' | 'b2b' = row.company_id ? 'b2b' : 'b2c';
+
+  return {
+    customerType,
+    companyId: row.company_id ?? null,
+    customerGroupId:
+      customerType === 'b2b'
+        ? row.company_customer_group_id ?? row.customer_group_id ?? null
+        : row.customer_group_id ?? null,
+    priceListId:
+      customerType === 'b2b'
+        ? row.company_customer_group_price_list_id ?? row.customer_group_price_list_id ?? null
+        : row.customer_group_price_list_id ?? null,
+  };
+};
 
 const getCatalogProductBaseById = async (productId: number): Promise<ProductBaseRow | null> => {
   const [rows] = await pool.query<ProductBaseRow[]>(
@@ -80,51 +160,39 @@ const getCatalogProductBaseById = async (productId: number): Promise<ProductBase
   return rows[0] ?? null;
 };
 
-type UserPricingContextRow = RowDataPacket & {
-  id: number;
-  customer_type: 'b2c' | 'b2b';
-  company_id: number | null;
-};
-
-const getUserPricingContext = async (
-  userId?: number | null,
+const getPriceListPrice = async (
+  productId: number,
+  priceListId?: number | null,
 ): Promise<{
-  customerType: 'b2c' | 'b2b';
-  companyId: number | null;
-}> => {
-  if (!userId) {
-    return {
-      customerType: 'b2c',
-      companyId: null,
-    };
+  priceNet: number;
+  priceGross: number;
+  vatRate: number;
+} | null> => {
+  if (!priceListId) {
+    return null;
   }
 
-  const [rows] = await pool.query<UserPricingContextRow[]>(
+  const [rows] = await pool.query<PriceListPriceRow[]>(
     `
       SELECT
-        u.id,
-        CASE
-          WHEN u.company_id IS NOT NULL THEN 'b2b'
-          ELSE 'b2c'
-        END AS customer_type,
-        u.company_id
-      FROM users u
-      WHERE u.id = ?
+        price_net,
+        price_gross,
+        vat_rate
+      FROM price_list_prices
+      WHERE product_id = ? AND price_list_id = ?
       LIMIT 1
     `,
-    [userId],
+    [productId, priceListId],
   );
 
   if (!rows.length) {
-    return {
-      customerType: 'b2c',
-      companyId: null,
-    };
+    return null;
   }
 
   return {
-    customerType: rows[0].customer_type ?? 'b2c',
-    companyId: rows[0].company_id,
+    priceNet: Number(rows[0].price_net),
+    priceGross: Number(rows[0].price_gross),
+    vatRate: Number(rows[0].vat_rate),
   };
 };
 
@@ -208,20 +276,30 @@ const calculateResolvedPrice = ({
   };
 };
 
-export const resolveProductPrice = async (productId: number, userId?: number | null): Promise<ResolvedPrice | null> => {
+export const resolveProductPrice = async (
+  productId: number,
+  pricingContext?: PriceListContext,
+): Promise<ResolvedPrice | null> => {
   const product = await getCatalogProductBaseById(productId);
 
   if (!product) {
     return null;
   }
 
-  const originalNet = Number(product.price_net);
-  const originalGross = Number(product.price_gross);
-  const vatRate = Number(product.vat_rate);
+  const context: PriceListContext = pricingContext ?? {
+    customerType: 'b2c',
+    companyId: null,
+    customerGroupId: null,
+    priceListId: null,
+  };
 
-  const userContext = await getUserPricingContext(userId ?? null);
+  const priceListPrice = await getPriceListPrice(productId, context.priceListId);
 
-  if (userContext.customerType !== 'b2b' || !userContext.companyId) {
+  const originalNet = priceListPrice ? priceListPrice.priceNet : Number(product.price_net);
+  const originalGross = priceListPrice ? priceListPrice.priceGross : Number(product.price_gross);
+  const vatRate = priceListPrice ? priceListPrice.vatRate : Number(product.vat_rate);
+
+  if (context.customerType !== 'b2b' || !context.companyId) {
     return calculateResolvedPrice({
       productId,
       originalNet,
@@ -229,12 +307,12 @@ export const resolveProductPrice = async (productId: number, userId?: number | n
       vatRate,
       discountPercent: 0,
       source: 'regular',
-      companyId: userContext.companyId,
-      customerType: userContext.customerType,
+      companyId: context.companyId,
+      customerType: context.customerType,
     });
   }
 
-  const overrideDiscount = await getCompanyProductOverrideDiscount(userContext.companyId, productId);
+  const overrideDiscount = await getCompanyProductOverrideDiscount(context.companyId, productId);
 
   if (overrideDiscount !== null) {
     return calculateResolvedPrice({
@@ -244,12 +322,12 @@ export const resolveProductPrice = async (productId: number, userId?: number | n
       vatRate,
       discountPercent: overrideDiscount,
       source: 'company_product_override',
-      companyId: userContext.companyId,
-      customerType: userContext.customerType,
+      companyId: context.companyId,
+      customerType: context.customerType,
     });
   }
 
-  const companyDefaultDiscount = await getCompanyDefaultDiscount(userContext.companyId);
+  const companyDefaultDiscount = await getCompanyDefaultDiscount(context.companyId);
 
   if (companyDefaultDiscount > 0) {
     return calculateResolvedPrice({
@@ -259,8 +337,8 @@ export const resolveProductPrice = async (productId: number, userId?: number | n
       vatRate,
       discountPercent: companyDefaultDiscount,
       source: 'company_default',
-      companyId: userContext.companyId,
-      customerType: userContext.customerType,
+      companyId: context.companyId,
+      customerType: context.customerType,
     });
   }
 
@@ -271,14 +349,14 @@ export const resolveProductPrice = async (productId: number, userId?: number | n
     vatRate,
     discountPercent: 0,
     source: 'regular',
-    companyId: userContext.companyId,
-    customerType: userContext.customerType,
+    companyId: context.companyId,
+    customerType: context.customerType,
   });
 };
 
 export const getCatalogProductWithPricing = async (
   productId: number,
-  userId?: number | null,
+  pricingContext?: PriceListContext,
 ): Promise<CatalogProduct | null> => {
   const product = await getCatalogProductBaseById(productId);
 
@@ -286,7 +364,7 @@ export const getCatalogProductWithPricing = async (
     return null;
   }
 
-  const pricing = await resolveProductPrice(productId, userId ?? null);
+  const pricing = await resolveProductPrice(productId, pricingContext);
 
   if (!pricing) {
     return null;
@@ -310,13 +388,13 @@ export const getCatalogProductsList = async ({
   limit,
   search,
   categoryId,
-  userId,
+  pricingContext,
 }: {
   page: number;
   limit: number;
   search: string;
   categoryId?: number | null;
-  userId?: number | null;
+  pricingContext?: PriceListContext;
 }) => {
   const offset = (page - 1) * limit;
   const params: Array<string | number> = [];
@@ -391,7 +469,7 @@ export const getCatalogProductsList = async ({
 
   const data = await Promise.all(
     rows.map(async (row) => {
-      const pricing = await resolveProductPrice(row.id, userId ?? null);
+      const pricing = await resolveProductPrice(row.id, pricingContext);
 
       if (!pricing) {
         return null;

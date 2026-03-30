@@ -1,5 +1,5 @@
-export const normalizeBadgeKey = (value: string) =>
-  value
+export const normalizeBadgeKey = (value?: string | null) =>
+  String(value ?? '')
     .trim()
     .toLowerCase()
     .replace(/\s+/g, '')

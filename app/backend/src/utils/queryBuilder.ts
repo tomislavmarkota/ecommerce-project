@@ -1,6 +1,6 @@
 export const buildUserQuery = ({ search, role }: { search?: string; role?: string }) => {
   let where = '';
-  const params: any[] = [];
+  const params: Array<string> = [];
 
   if (search) {
     where += `
@@ -8,10 +8,11 @@ export const buildUserQuery = ({ search, role }: { search?: string; role?: strin
         u.name LIKE ?
         OR u.email LIKE ?
         OR r.name LIKE ?
-        OR u.company_name LIKE ?
+        OR c.name LIKE ?
       )
     `;
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    const like = `%${search}%`;
+    params.push(like, like, like, like);
   }
 
   if (role) {
@@ -20,7 +21,9 @@ export const buildUserQuery = ({ search, role }: { search?: string; role?: strin
     params.push(role);
   }
 
-  if (where) where = `WHERE ${where}`;
+  if (where) {
+    where = `WHERE ${where}`;
+  }
 
   return { where, params };
 };

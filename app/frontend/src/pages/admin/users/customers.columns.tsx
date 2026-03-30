@@ -11,7 +11,7 @@ export type CustomerRow = {
   companyName: string | null;
 };
 
-const getBadgeClass = (value: string) => {
+const getBadgeClass = (value?: string | null) => {
   const key = normalizeBadgeKey(value) as keyof typeof styles;
   return styles[key] || styles.defaultBadge;
 };
@@ -29,9 +29,18 @@ export const customerColumns: ColumnDef<CustomerRow>[] = [
     accessorKey: 'customerType',
     header: 'Customer Type',
     cell: ({ getValue }) => {
-      const customerType = getValue() as string;
+      const customerType = (getValue() as string | null | undefined) ?? 'unknown';
 
       return <span className={`${styles.badge} ${getBadgeClass(customerType)}`}>{customerType.toUpperCase()}</span>;
+    },
+  },
+  {
+    accessorKey: 'role',
+    header: 'Role',
+    cell: ({ getValue }) => {
+      const role = (getValue() as string | null | undefined) ?? 'unknown';
+
+      return <span className={`${styles.badge} ${getBadgeClass(role)}`}>{role}</span>;
     },
   },
   {
@@ -46,15 +55,6 @@ export const customerColumns: ColumnDef<CustomerRow>[] = [
       }
 
       return companyName ? companyName : <span className={styles.mutedText}>No company</span>;
-    },
-  },
-  {
-    accessorKey: 'role',
-    header: 'Role',
-    cell: ({ getValue }) => {
-      const role = getValue() as string;
-
-      return <span className={`${styles.badge} ${getBadgeClass(role)}`}>{role}</span>;
     },
   },
 ];

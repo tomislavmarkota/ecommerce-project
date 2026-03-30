@@ -1,5 +1,6 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { ProductRow } from '../../../api/product';
+import { normalizeBadgeKey } from '../../../utils/badge';
 import styles from './Product.module.scss';
 
 const formatCurrency = (value: number | null) => {
@@ -19,6 +20,11 @@ const formatDate = (value: string) =>
     year: 'numeric',
   });
 
+const getBadgeClass = (value?: string | null) => {
+  const key = normalizeBadgeKey(value) as keyof typeof styles;
+  return styles[key] || styles.defaultBadge;
+};
+
 export const productColumns: ColumnDef<ProductRow>[] = [
   {
     accessorKey: 'name',
@@ -28,17 +34,15 @@ export const productColumns: ColumnDef<ProductRow>[] = [
 
       return (
         <div className={styles.productCell}>
-          <div className={styles.productThumb}>
-            {product.thumbnail ? (
-              <img src={product.thumbnail} alt={product.name} className={styles.productImage} />
-            ) : (
-              <div className={styles.productImagePlaceholder}>N/A</div>
-            )}
-          </div>
+          {product.thumbnail ? (
+            <img src={product.thumbnail} alt={product.name} className={styles.productThumbnail} />
+          ) : (
+            <div className={styles.thumbnailPlaceholder}>N/A</div>
+          )}
 
           <div className={styles.productMeta}>
-            <span className={styles.productName}>{product.name}</span>
-            <span className={styles.productCategory}>{product.category_name || 'No category'}</span>
+            <div className={styles.productName}>{product.name}</div>
+            <div className={styles.productCategory}>{product.category_name || 'No category'}</div>
           </div>
         </div>
       );
@@ -62,18 +66,21 @@ export const productColumns: ColumnDef<ProductRow>[] = [
   {
     accessorKey: 'stock',
     header: 'Stock',
+    cell: ({ getValue }) => {
+      const stock = Number(getValue() ?? 0);
+      const label = stock > 0 ? 'In stock' : 'Out of stock';
+
+      return <span className={`${styles.badge} ${getBadgeClass(label)}`}>{label}</span>;
+    },
   },
   {
     accessorKey: 'is_published',
     header: 'Status',
     cell: ({ getValue }) => {
       const published = Boolean(getValue());
+      const label = published ? 'Published' : 'Draft';
 
-      return (
-        <span className={`${styles.badge} ${published ? styles.published : styles.draft}`}>
-          {published ? 'Published' : 'Draft'}
-        </span>
-      );
+      return <span className={`${styles.badge} ${getBadgeClass(label)}`}>{label}</span>;
     },
   },
   {

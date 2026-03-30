@@ -7,11 +7,14 @@ type RegisterB2BInput = {
   email: string;
   password: string;
   phone?: string | null;
-  address_line1?: string | null;
-  address_line2?: string | null;
+  address?: string | null;
   city?: string | null;
   postal_code?: string | null;
   country?: string | null;
+  delivery_address?: string | null;
+  delivery_city?: string | null;
+  delivery_postal_code?: string | null;
+  delivery_country?: string | null;
   company_name: string;
   vat_number: string;
 };
@@ -97,37 +100,26 @@ export const registerB2B = async (input: RegisterB2BInput) => {
   const email = input.email?.trim().toLowerCase();
   const password = input.password;
   const phone = input.phone?.trim() || null;
-  const addressLine1 = input.address_line1?.trim() || null;
-  const addressLine2 = input.address_line2?.trim() || null;
+
+  const address = input.address?.trim() || null;
   const city = input.city?.trim() || null;
   const postalCode = input.postal_code?.trim() || null;
   const country = input.country?.trim() || null;
+
+  const deliveryAddress = input.delivery_address?.trim() || null;
+  const deliveryCity = input.delivery_city?.trim() || null;
+  const deliveryPostalCode = input.delivery_postal_code?.trim() || null;
+  const deliveryCountry = input.delivery_country?.trim() || null;
+
   const companyName = input.company_name?.trim();
   const vatNumber = input.vat_number?.trim();
 
-  if (!name) {
-    throw createHttpError(400, 'Name is required');
-  }
-
-  if (!email) {
-    throw createHttpError(400, 'Email is required');
-  }
-
-  if (!password) {
-    throw createHttpError(400, 'Password is required');
-  }
-
-  if (password.length < 8) {
-    throw createHttpError(400, 'Password must be at least 8 characters');
-  }
-
-  if (!companyName) {
-    throw createHttpError(400, 'Company name is required');
-  }
-
-  if (!vatNumber) {
-    throw createHttpError(400, 'VAT number is required');
-  }
+  if (!name) throw createHttpError(400, 'Name is required');
+  if (!email) throw createHttpError(400, 'Email is required');
+  if (!password) throw createHttpError(400, 'Password is required');
+  if (password.length < 8) throw createHttpError(400, 'Password must be at least 8 characters');
+  if (!companyName) throw createHttpError(400, 'Company name is required');
+  if (!vatNumber) throw createHttpError(400, 'VAT number is required');
 
   const [existingUsers] = await pool.query<ExistingUserRow[]>(`SELECT id FROM users WHERE email = ? LIMIT 1`, [email]);
 
@@ -138,13 +130,10 @@ export const registerB2B = async (input: RegisterB2BInput) => {
   const b2bCustomerGroupId = await findB2BCustomerGroupId();
 
   let companyId: number;
-  let finalCompanyName = companyName;
-
   const existingCompany = await findCompanyByNameOrVat(companyName, vatNumber);
 
   if (existingCompany) {
     companyId = existingCompany.id;
-    finalCompanyName = existingCompany.name;
   } else {
     companyId = await createCompany({
       name: companyName,
@@ -162,12 +151,14 @@ export const registerB2B = async (input: RegisterB2BInput) => {
         email,
         password,
         phone,
-        address_line1,
-        address_line2,
+        address,
         city,
         postal_code,
         country,
-        company_name,
+        delivery_address,
+        delivery_city,
+        delivery_postal_code,
+        delivery_country,
         vat_number,
         is_verified,
         is_active,
@@ -177,19 +168,21 @@ export const registerB2B = async (input: RegisterB2BInput) => {
         customer_group_id,
         company_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       name,
       email,
       hashedPassword,
       phone,
-      addressLine1,
-      addressLine2,
+      address,
       city,
       postalCode,
       country,
-      finalCompanyName,
+      deliveryAddress,
+      deliveryCity,
+      deliveryPostalCode,
+      deliveryCountry,
       vatNumber,
       0,
       1,
@@ -210,21 +203,25 @@ export const registerB2B = async (input: RegisterB2BInput) => {
         u.name,
         u.email,
         u.phone,
-        u.address_line1,
-        u.address_line2,
+        u.address,
         u.city,
         u.postal_code,
         u.country,
-        u.company_name,
+        u.delivery_address,
+        u.delivery_city,
+        u.delivery_postal_code,
+        u.delivery_country,
         u.vat_number,
         u.customer_group_id,
         u.company_id,
+        c.name AS companyName,
         r.name AS role,
         CASE
           WHEN u.company_id IS NOT NULL THEN 'b2b'
           ELSE 'b2c'
         END AS customerType
       FROM users u
+      LEFT JOIN companies c ON c.id = u.company_id
       JOIN roles r ON r.id = u.role_id
       WHERE u.id = ?
       LIMIT 1
